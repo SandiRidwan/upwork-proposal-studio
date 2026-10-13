@@ -155,8 +155,8 @@ def _heuristic_reviews(proposal: str, job_post: str) -> list:
         else "Opens on the writer, or the first two lines don't name a problem."))
 
     # 2 Hiring client
-    mentions_their = any(w in low for w in
-                         ["you", "your", "you're", "you've"])
+    mentions_their = bool(re.search(r"\byou\b|\byour\b|\byou're\b|\byou'll\b|"
+                                    r"\byou've\b|\byou'd\b", low))
     has_question = proposal.strip().endswith("?")
     if mentions_their and has_question:
         hc = "INTERVIEW"
@@ -168,6 +168,8 @@ def _heuristic_reviews(proposal: str, job_post: str) -> list:
         "hiring_client", "The Hiring Client", hc,
         "Speaks to the client and asks a closing question."
         if hc == "INTERVIEW" else
+        "Speaks to the client but doesn't close on a question."
+        if hc == "MAYBE" else
         "Talks about the writer more than the client's problem."))
 
     # 3 Budget client

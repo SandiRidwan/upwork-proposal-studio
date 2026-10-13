@@ -10,15 +10,17 @@ prompt (for opencode or any chat) plus deterministic scaffolds.
 """
 
 from .analyzer import analyze, JobAnalysis
-from .writer import write, lint, build_prompt, ProposalBundle
+from .writer import (write, write_one, write_both, lint, build_prompt,
+                     ProposalBundle)
 from .panel import review, PanelReport, before_after
 from . import llm, knowledge
 from .pipeline import run
 
-__version__ = "1.0.0"
+__version__ = "1.1.0"
 __all__ = [
     "analyze", "JobAnalysis",
-    "write", "lint", "build_prompt", "ProposalBundle",
+    "write", "write_one", "write_both", "lint", "build_prompt",
+    "ProposalBundle",
     "review", "PanelReport", "before_after",
     "run", "llm", "knowledge",
 ]

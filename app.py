@@ -1,7 +1,7 @@
 """
 Upwork Proposal Studio - Streamlit UI.
 
-Paste a job post -> analyze -> two proposals + 7-persona panel verdict.
+Paste a job post -> write ONE proposal -> 7 agents select it.
 Works with or without an API key.
 
     streamlit run app.py
@@ -72,7 +72,7 @@ with st.sidebar:
         )
 
     use_llm = st.toggle("Use LLM when available", value=True)
-    do_review = st.toggle("Run 7-persona panel", value=True)
+    do_review = st.toggle("Run 7-agent selection panel", value=True)
     do_rewrite = st.toggle("Panel also rewrites (slower)", value=False)
 
     st.divider()
@@ -96,8 +96,8 @@ with st.sidebar:
 
 st.title("🎯 Upwork Proposal Studio")
 st.caption(
-    "Paste a job post. Get two proposals in your real voice, plus a 7-reviewer "
-    "panel that tells you why it would get skipped, before you spend a Connect."
+    "Paste a job post. Write one proposal in your real voice, then seven agents "
+    "select it and tell you why it would get skipped, before you spend a Connect."
 )
 
 tab_write, tab_review, tab_knowledge = st.tabs(
@@ -136,14 +136,15 @@ with tab_write:
         if not job_post.strip():
             st.error("Paste a job post first.")
         else:
-            with st.spinner("Analyzing, writing, and convening the panel..."):
+            with st.spinner("Analyzing, writing one proposal, and convening the "
+                            "7-agent panel..."):
                 st.session_state["result"] = run(
                     job_post,
                     client_info=client_info,
                     screening=screening,
                     bid=bid,
                     use_llm=use_llm,
-                    review_variants=do_review,
+                    review=do_review,
                     rewrite=do_rewrite,
                 ).to_dict()
             st.session_state["ran_at"] = datetime.now().strftime("%H:%M:%S")
@@ -185,26 +186,28 @@ with tab_write:
         if not result["meta"]["writer_used_llm"]:
             st.info(result["proposal"].get("notes", ""))
 
-        st.markdown("#### ✍️ Proposals")
+        st.markdown("#### ✍️ Proposal")
         variants = result["proposal"]["variants"]
-        vcols = st.columns(len(variants)) if variants else []
-        for col, v in zip(vcols, variants):
-            with col:
-                st.markdown(f"**{v['title']}** · {v['word_count']} words")
-                st.markdown(
-                    f"<div class='prop-box'>{v['body']}</div>",
-                    unsafe_allow_html=True)
-                if v["lint"]:
-                    for issue in v["lint"]:
-                        st.markdown(
-                            f"<span class='lint-bad'>⚠ {issue['rule']}: "
-                            f"{issue['detail']}</span>", unsafe_allow_html=True)
-                else:
-                    st.markdown("<span class='lint-ok'>✓ voice rules pass</span>",
-                                unsafe_allow_html=True)
-                st.download_button(
-                    "Download .txt", v["body"],
-                    file_name=f"proposal_{v['label']}.txt", key=f"dl_{v['label']}")
+        for v in variants:
+            badge = ""
+            if v["label"] == "improved":
+                badge = "  ·  ⬆️ panel improved this"
+            st.markdown(f"**{v['title']}** · {v['word_count']} words{badge}")
+            st.markdown(
+                f"<div class='prop-box'>{v['body']}</div>",
+                unsafe_allow_html=True)
+            if v["lint"]:
+                for issue in v["lint"]:
+                    st.markdown(
+                        f"<span class='lint-bad'>⚠ {issue['rule']}: "
+                        f"{issue['detail']}</span>", unsafe_allow_html=True)
+            else:
+                st.markdown("<span class='lint-ok'>✓ voice rules pass</span>",
+                            unsafe_allow_html=True)
+            st.download_button(
+                "Download .txt", v["body"],
+                file_name=f"proposal_{v['label']}.txt", key=f"dl_{v['label']}")
+            st.divider()
 
         if result["proposal"]["screening_answers"]:
             st.markdown("#### 📝 Screening answers")
@@ -212,9 +215,9 @@ with tab_write:
                 st.markdown(f"**Q:** {qa['question']}")
                 st.code(qa["answer"], language=None)
 
-        if result["proposal"].get("prompt") and not result["meta"]["writer_used_llm"]:
+        if not result["meta"]["writer_used_llm"]:
             with st.expander("📋 Ready-to-paste prompt (run this in opencode)"):
-                st.code(result["proposal"]["prompt"], language="markdown")
+                st.code(result["proposal"].get("prompt", ""), language="markdown")
 
         with st.expander("⬇️ Export full result (JSON)"):
             st.download_button(
@@ -227,65 +230,65 @@ with tab_write:
 
 with tab_review:
     result = st.session_state.get("result")
-    if not result or not result.get("panels"):
-        st.info("Run the writer first (or enable the panel) to see the review.")
+    panel = result.get("panel") if result else None
+    if not panel:
+        st.info("Run the writer first (with the panel enabled) to see the "
+                "7-agent selection.")
     else:
-        for idx, panel in enumerate(result["panels"]):
-            vlabel = result["proposal"]["variants"][idx]["title"]
-            st.markdown(f"### {vlabel}")
+        st.markdown("### 🧑‍⚖️ 7-agent selection of your proposal")
 
-            chance = panel["interview_chance"]
-            color = {"HIGH": "green", "MEDIUM": "orange", "LOW": "red"}[chance]
+        chance = panel["interview_chance"]
+        color = {"HIGH": "green", "MEDIUM": "orange", "LOW": "red"}.get(
+            chance, "orange")
+        st.markdown(
+            f"**Interview chance:** :{color}[{chance}]  ·  "
+            f"{'LLM panel' if panel['used_llm'] else 'heuristic panel'}  ·  "
+            f"{result['meta'].get('panel_reviewers', 7)} reviewers")
+
+        sc = panel["scores"]
+        cols = st.columns(len(SCORE_DIMENSIONS))
+        for col, dim in zip(cols, SCORE_DIMENSIONS):
+            val = sc.get(dim, 0)
+            col.metric(dim, f"{val}/10")
+
+        st.markdown("#### 🧑‍⚖️ Reviewers (each read it alone)")
+        for r in panel["reviews"]:
+            style = ("v-good" if r["verdict"] in
+                     ("OPEN", "INTERVIEW", "WORTH IT", "I WIN", "TRUST",
+                      "KNOWS IT", "SHORTLIST")
+                     else "v-mid" if r["verdict"] in
+                     ("MAYBE", "NOT SURE", "TOSS-UP", "UNSURE", "VAGUE",
+                      "ARCHIVE")
+                     else "v-bad")
             st.markdown(
-                f"**Interview chance:** :{color}[{chance}] "
-                f"· {'LLM panel' if panel['used_llm'] else 'heuristic panel'}")
+                f"**{r['name']}** — "
+                f"<span class='verdict {style}'>{r['verdict']}</span><br>"
+                f"<span style='color:#94a3b8;font-size:.9rem'>{r['reason']}</span>",
+                unsafe_allow_html=True)
 
-            sc = panel["scores"]
-            cols = st.columns(len(SCORE_DIMENSIONS))
-            for col, dim in zip(cols, SCORE_DIMENSIONS):
-                val = sc.get(dim, 0)
-                col.metric(dim, f"{val}/10")
+        if panel["problems"]:
+            st.markdown("#### ⚠️ Problems, worst first")
+            for i, p in enumerate(panel["problems"], 1):
+                st.markdown(f"{i}. {p}")
 
-            st.markdown("#### 🧑‍⚖️ Reviewers")
-            for r in panel["reviews"]:
-                style = ("v-good" if r["verdict"] in
-                         ("OPEN", "INTERVIEW", "WORTH IT", "I WIN", "TRUST",
-                          "KNOWS IT", "SHORTLIST")
-                         else "v-mid" if r["verdict"] in
-                         ("MAYBE", "NOT SURE", "TOSS-UP", "UNSURE", "VAGUE",
-                          "ARCHIVE")
-                         else "v-bad")
-                st.markdown(
-                    f"**{r['name']}** — "
-                    f"<span class='verdict {style}'>{r['verdict']}</span><br>"
-                    f"<span style='color:#94a3b8;font-size:.9rem'>{r['reason']}</span>",
-                    unsafe_allow_html=True)
+        st.markdown("#### 🗣️ The rejection story (in the client's voice)")
+        st.info(panel["rejection_story"])
 
-            if panel["problems"]:
-                st.markdown("#### ⚠️ Problems, worst first")
-                for i, p in enumerate(panel["problems"], 1):
-                    st.markdown(f"{i}. {p}")
-
-            st.markdown("#### 🗣️ The rejection story (in the client's voice)")
-            st.info(panel["rejection_story"])
-
-            if panel.get("rewrite"):
-                st.markdown("#### ♻️ Suggested rewrite")
-                st.markdown(
-                    f"<div class='prop-box'>{panel['rewrite']}</div>",
-                    unsafe_allow_html=True)
-                ba = panel.get("before_after", {})
-                if ba:
-                    cc = st.columns(2)
-                    cc[0].markdown(
-                        f"**Scroller:** {ba.get('scroller',{}).get('before')} "
-                        f"→ {ba.get('scroller',{}).get('after')}")
-                    cc[1].markdown(
-                        f"**Hiring Client:** "
-                        f"{ba.get('hiring_client',{}).get('before')} "
-                        f"→ {ba.get('hiring_client',{}).get('after')}")
-
-            st.divider()
+        if panel.get("rewrite"):
+            st.markdown("#### ♻️ Panel rewrite")
+            st.markdown(
+                f"<div class='prop-box'>{panel['rewrite']}</div>",
+                unsafe_allow_html=True)
+            ba = panel.get("before_after", {})
+            if ba:
+                cc = st.columns(2)
+                cc[0].markdown(
+                    f"**Scroller:** {ba.get('scroller',{}).get('before')} "
+                    f"→ {ba.get('scroller',{}).get('after')}")
+                cc[1].markdown(
+                    f"**Hiring Client:** "
+                    f"{ba.get('hiring_client',{}).get('before')} "
+                    f"→ {ba.get('hiring_client',{}).get('after')}")
 
 
 # ---------------------------------------------------------------- knowledge tab

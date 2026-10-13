@@ -60,6 +60,11 @@ class ProposalBundle:
     prompt: str = ""
     notes: str = ""
 
+    @property
+    def primary(self) -> Variant:
+        """The single proposal the panel judges."""
+        return self.variants[0] if self.variants else Variant("proposal", "", "", 0)
+
     def to_dict(self) -> dict:
         return {
             "variants": [v.to_dict() for v in self.variants],
@@ -93,6 +98,28 @@ VOICE RULES (hard):
 - If a required fact is missing, write [ADD: ...] and ask.
 
 Use ONLY the credibility facts and portfolio links provided. Do not invent any."""
+
+
+# The single proposal the panel will judge. It blends both parents:
+# fahad's process-led depth (moves 1-5) with aahk's "answer the client's real
+# question" framing, aimed at a winnable job.
+ONE_SYSTEM = """You are Sandi Ridwan, writing ONE Upwork proposal that will win this job.
+
+Write a single, complete proposal (180-280 words). It must be the best possible
+version of both skills combined:
+- the five-move structure (problem -> proof -> credibility -> risk-kill -> question)
+- a clear read of what the client is actually afraid of, and a direct answer to it
+
+Structure (prose, no headings, no labels):
+1. Open on the client's failure mode, in their words. No greeting. Never credentials.
+2. One precise technical detail only an insider would say.
+3. Exactly one credibility line, mid-proposal. Never the opener.
+4. Kill the hiring risk: a free sample, mini-audit, or one concrete first step.
+5. Close with a scoped, easy-to-answer question. Never "looking forward to hearing".
+
+Use ONLY the credibility facts and portfolio links provided. Never invent a client,
+result, metric, or technology. If a needed fact is missing, write [ADD: ...] and ask.
+Return ONLY the proposal text, nothing else."""
 
 
 def build_prompt(analysis: JobAnalysis, job_post: str,
@@ -153,34 +180,116 @@ def build_prompt(analysis: JobAnalysis, job_post: str,
 
 # ---------------------------------------------------------------- live write
 
+def write_one(analysis: JobAnalysis, job_post: str, *,
+              include_screening: bool = True) -> ProposalBundle:
+    """
+    Write ONE complete proposal, then it is ready for the 7-agent panel.
+
+    This is the combined flow: a single, best-effort proposal (both parents'
+    strengths merged) rather than two parallel drafts. The panel judges this one.
+    """
+    user = _one_prompt(analysis, job_post)
+    res = llm.ask(ONE_SYSTEM, user, temperature=0.75, max_tokens=1400)
+
+    bundle = ProposalBundle(prompt=user)
+
+    if res.ok and res.text.strip():
+        bundle.used_llm = True
+        body = _strip_labels(res.text)
+        v = _variant("proposal", body)
+        v.lint = lint(v.body)
+        bundle.variants = [v]
+    else:
+        bundle.notes = (
+            "No live LLM. Below is a ready-to-paste prompt for opencode plus "
+            "an editable scaffold you can refine, then run the panel on it. "
+            "Set an API key for full prose."
+        )
+        v = _skeleton(analysis, "process")
+        v.lint = lint(v.body)
+        bundle.variants = [v]
+
+    if include_screening:
+        bundle.screening_answers = _screening_answers(
+            analysis, job_post, res.ok)
+
+    return bundle
+
+
+def _one_prompt(analysis: JobAnalysis, job_post: str) -> str:
+    pos = knowledge.positioning()
+    port = knowledge.portfolio()
+    voice = knowledge.voice()
+    wins = knowledge.wins()
+    a = analysis
+    facts = (
+        f"NICHE: {a.niche} ({a.niche_label})\n"
+        f"FAILURE MODE: {a.failure_mode}\n"
+        f"NAMED SYMPTOM: {a.named_symptom or '(none)'}\n"
+        f"CLIENT TYPE: {a.client_type}\n"
+        f"URGENCY: {a.urgency}\n"
+        f"BUDGET SIGNAL: {a.budget_signal}\n"
+        f"RED FLAGS: {', '.join(a.red_flags) or 'none'}\n"
+        f"CREDIBILITY FACT TO USE: {a.credibility_fact}\n"
+        f"PORTFOLIO LINK (at most one): {a.portfolio_link}\n"
+        f"ONE TRUE OBSERVATION: {a.one_true_observation}\n"
+    )
+    return f"""{ONE_SYSTEM}
+
+--- IDENTITY: POSITIONING (facts you may claim) ---
+{pos}
+
+--- IDENTITY: PORTFOLIO (links you may use) ---
+{port}
+
+--- VOICE RULEBOOK ---
+{voice}
+
+--- ANNOTATED WINNING PATTERNS (steal the move, never the sentence) ---
+{wins}
+
+--- ANALYSIS OF THIS JOB ---
+{facts}
+
+--- JOB POST ---
+{job_post[:5000]}
+
+--- TASK ---
+Write the ONE proposal now. Prose only, 180-280 words, no headings, no labels.
+"""
+
+
+def _strip_labels(text: str) -> str:
+    """Remove any === LABEL === lines the model may still emit."""
+    text = re.sub(r"^\s*={2,}.*?={2,}\s*$", "", text, flags=re.M)
+    text = re.sub(r"^\s*#+\s.*$", "", text, flags=re.M)
+    return text.strip()
+
+
 def write(analysis: JobAnalysis, job_post: str, *,
           include_screening: bool = True) -> ProposalBundle:
+    """Backwards-compatible alias: now writes ONE proposal (the combined flow)."""
+    return write_one(analysis, job_post, include_screening=include_screening)
+
+
+def write_both(analysis: JobAnalysis, job_post: str) -> ProposalBundle:
+    """Optional: two labelled variants, for when you want to pick by hand."""
     prompt = build_prompt(analysis, job_post, "both")
-    res = llm.ask(SYSTEM, prompt.split("--- TASK ---")[-1].strip()
-                  if False else prompt, temperature=0.75, max_tokens=1800)
+    res = llm.ask(SYSTEM, prompt, temperature=0.75, max_tokens=1800)
 
     bundle = ProposalBundle(prompt=prompt)
-
     if res.ok:
         bundle.used_llm = True
         bundle.variants = _split_variants(res.text)
-        for v in bundle.variants:
-            v.lint = lint(v.body)
     else:
-        bundle.notes = (
-            "No live LLM. Below are (1) a ready-to-paste prompt for opencode and "
-            "(2) deterministic skeletons you can edit. Set an API key for full prose."
-        )
+        bundle.notes = "No live LLM; deterministic skeletons shown."
         bundle.variants = [
             _skeleton(analysis, "short"),
             _skeleton(analysis, "process"),
         ]
-        for v in bundle.variants:
-            v.lint = lint(v.body)
-
-    if include_screening:
-        bundle.screening_answers = _screening_answers(analysis, job_post, res.ok)
-
+    for v in bundle.variants:
+        v.lint = lint(v.body)
+    bundle.screening_answers = _screening_answers(analysis, job_post, res.ok)
     return bundle
 
 

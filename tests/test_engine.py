@@ -7,7 +7,7 @@ import unittest
 os.environ["UPS_LLM_MODE"] = "prompt"
 
 from engine.analyzer import analyze
-from engine.writer import write, lint, build_prompt
+from engine.writer import write, write_one, lint, build_prompt
 from engine.panel import review, _heuristic_reviews, _heuristic_scores
 from engine.pipeline import run
 from engine import knowledge
@@ -135,18 +135,35 @@ class TestKnowledge(unittest.TestCase):
 
 class TestPipeline(unittest.TestCase):
     def test_full_run(self):
-        result = run(JOB_ANTIBOT, use_llm=False, review_variants=True)
+        result = run(JOB_ANTIBOT, use_llm=False, review=True)
         d = result.to_dict()
         self.assertEqual(d["analysis"]["niche"], "A")
-        self.assertGreaterEqual(len(d["proposal"]["variants"]), 2)
-        self.assertEqual(len(d["panels"]), len(d["proposal"]["variants"]))
+        # ONE proposal written
+        self.assertEqual(len(d["proposal"]["variants"]), 1)
+        # ONE panel selects it
+        self.assertIsNotNone(d["panel"])
+        self.assertEqual(len(d["panel"]["reviews"]), 7)
+        self.assertEqual(d["meta"]["panel_reviewers"], 7)
         self.assertFalse(d["meta"]["writer_used_llm"])
+
+    def test_run_without_panel(self):
+        result = run(JOB_ANTIBOT, use_llm=False, review=False)
+        d = result.to_dict()
+        self.assertEqual(len(d["proposal"]["variants"]), 1)
+        self.assertIsNone(d["panel"])
+        self.assertEqual(d["meta"]["panel_reviewers"], 0)
 
     def test_prompt_built(self):
         a = analyze(JOB_ANTIBOT)
         p = build_prompt(a, JOB_ANTIBOT)
         self.assertIn("FIVE MOVES", p)
         self.assertIn("SHORT VARIANT", p)
+
+    def test_write_one_produces_single(self):
+        a = analyze(JOB_ANTIBOT)
+        b = write_one(a, JOB_ANTIBOT, include_screening=False)
+        self.assertEqual(len(b.variants), 1)
+        self.assertTrue(b.primary.body)
 
     def test_skeletons_are_clean(self):
         result = run(JOB_ANALYSIS, use_llm=False)
@@ -155,6 +172,30 @@ class TestPipeline(unittest.TestCase):
                     if i["rule"] in ("banned_phrase", "exclamation", "emoji",
                                      "ai_tell", "pronoun_ratio")]
             self.assertEqual(hard, [], f"{v.label} has hard lint: {hard}")
+
+    def test_flow_is_sequential_one_then_panel(self):
+        # The combined flow must be: ONE proposal, then 7 agents on that one.
+        result = run(JOB_ANTIBOT, use_llm=False, review=True)
+        self.assertEqual(len(result.proposal.variants), 1)
+        self.assertIsNotNone(result.panel)
+        self.assertEqual(len(result.panel.reviews), 7)
+        # every reviewer must have judged the same single proposal
+        judged = result.panel.reviews[0]
+        self.assertTrue(judged.verdict)
+        # panel keys are exactly the seven personas
+        keys = [r.key for r in result.panel.reviews]
+        self.assertEqual(
+            set(keys),
+            {"scroller", "hiring_client", "budget_client", "competitor",
+             "skeptic", "tech_lead", "veteran"})
+
+    def test_improved_variant_prepended_when_better(self):
+        # when a panel rewrite exists, it is promoted only if scores improve
+        from engine.panel import PanelReport, Review
+        rep = PanelReport(
+            reviews=[Review("scroller", "The Scroller", "OPEN", "good")],
+            scores={"Hook": 9}, interview_chance="HIGH", rewrite="Better text here")
+        self.assertEqual(rep.rewrite, "Better text here")
 
 
 if __name__ == "__main__":

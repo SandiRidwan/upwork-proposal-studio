@@ -1,16 +1,20 @@
 # Upwork Proposal Studio
 
-A personal tool that turns an Upwork job post into **two proposals in your real
-voice**, then runs a **7-reviewer hiring panel** that tells you why it would get
-skipped — before you spend a Connect.
+A personal tool that turns an Upwork job post into **one proposal in your real
+voice**, then runs **seven independent agents** that select it — and tell you why it
+would get skipped, before you spend a Connect.
 
-Built by [Sandi Ridwan](https://github.com/SandiRidwan) by adapting the ideas in two
-excellent open-source skills:
+Built by [Sandi Ridwan](https://github.com/SandiRidwan) by merging the two ideas into
+one flow:
 
 - [`fahadqaseem/upwork-proposal-writing-skill`](https://github.com/fahadqaseem/upwork-proposal-writing-skill)
-  — the five-move structure, the voice rulebook, the annotated corpus.
+  — the five-move structure, the voice rulebook, the annotated corpus. **(the writer)**
 - [`aaksa/upwork-hiring-panel-skill`](https://github.com/aaksa/upwork-hiring-panel-skill)
-  — the seven independent reviewer personas and the rejection-story rewrite.
+  — the seven independent reviewer personas, the run-on-one-proposal selection, the
+  rejection-story rewrite. **(the panel)**
+
+The two are joined sequentially, exactly as intended: **the proposal is written
+first, then it is put in front of the panel.** One proposal in, one verdict out.
 
 It is **not** a Claude Skill. It runs as a normal repo: a Python engine, a Streamlit
 UI, and a set of Markdown knowledge files that define who you are and how you write.
@@ -25,14 +29,23 @@ You paste a job post. The studio:
 1. **Analyzes the brief** — detects the niche (anti-bot / automation / analysis /
    platform / lead-gen), the *failure mode* (every job post is a complaint in
    disguise), the client type, urgency, and red/green flags.
-2. **Writes two proposals** — a short, punchy variant and a process-led variant,
-   following the fixed **five-move structure** and the voice rulebook.
+2. **Writes ONE complete proposal** — a single, best-effort draft that blends a
+   process-led body with a direct read of the client's fear, following the fixed
+   **five-move structure** and the voice rulebook.
 3. **Lints its own output** — deterministic checks for banned phrases, exclamation
    points, emoji, em dashes, pronoun ratio, AI tells, and length.
-4. **Convenes the hiring panel** — seven reviewers read the proposal *alone* and
-   score Hook, Clarity, Relevance, Credibility, Value Proposition, and Interview
-   Potential, then write the rejection story in the client's voice.
-5. **Optionally rewrites** — same facts, and shows the before/after verdict.
+4. **Puts that one proposal in front of 7 agents** — each reviewer reads it *alone*
+   (nobody sees the others), gives an independent verdict, and the scores merge into
+   Hook, Clarity, Relevance, Credibility, Value Proposition, and Interview Potential,
+   plus a rejection story in the client's voice.
+5. **Optionally rewrites** — same facts, and if the rewrite scores higher it becomes
+   the shipped proposal, with the before/after verdict shown.
+
+The flow, in one line:
+
+```
+job post -> analyze -> write ONE proposal -> 7 agents select it -> verdict (+ rewrite)
+```
 
 ## The five moves
 
@@ -132,9 +145,9 @@ upwork-proposal-studio/
 ├── engine/
 │   ├── __init__.py
 │   ├── analyzer.py           job post -> niche, failure mode, flags
-│   ├── writer.py             5-move structure, two variants, linter
+│   ├── writer.py             5-move structure, ONE proposal, linter
 │   ├── panel.py              7-persona review + rejection story + rewrite
-│   ├── pipeline.py           one-call orchestration
+│   ├── pipeline.py           analyze -> write one -> 7 agents select
 │   ├── knowledge.py          loads knowledge/
 │   ├── llm.py                provider abstraction (openai/groq/openrouter/ollama)
 │   └── cli.py                command-line entry
