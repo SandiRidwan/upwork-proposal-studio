@@ -375,7 +375,7 @@ def _refine_with_llm(a: JobAnalysis, text: str) -> bool:
         f"Urgency: {a.urgency}\n\n"
         f"Job post:\n{text[:4000]}"
     )
-    res = llm.ask(_REFINE_SYSTEM, user, temperature=0.3, max_tokens=500)
+    res = llm.ask(_REFINE_SYSTEM, user, temperature=0.3, max_tokens=800)
     if not res.ok:
         return False
     data = _extract_json(res.text)

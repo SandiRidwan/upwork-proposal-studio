@@ -14,6 +14,9 @@ import argparse
 import json
 import sys
 
+from . import env
+env.load_env()  # read .env before anything inspects keys
+
 from .pipeline import run
 from . import llm, knowledge
 
@@ -64,7 +67,8 @@ def main(argv=None) -> int:
     def read(path, fallback=""):
         if not path:
             return fallback
-        with open(path, encoding="utf-8") as f:
+        # utf-8-sig tolerates a BOM (Windows editors and PowerShell add one)
+        with open(path, encoding="utf-8-sig") as f:
             return f.read()
 
     if args.job_file:

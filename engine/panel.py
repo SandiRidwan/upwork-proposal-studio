@@ -388,7 +388,7 @@ def _llm_enrich(report: PanelReport, proposal: str, job_post: str,
         f"--- deterministic lint already found ---\n"
         f"{[p for p in report.problems]}"
     )
-    res = llm.ask(_PANEL_SYSTEM, user, temperature=0.4, max_tokens=1600)
+    res = llm.ask(_PANEL_SYSTEM, user, temperature=0.4, max_tokens=3000)
     if not res.ok:
         return
     from .analyzer import _extract_json
@@ -472,7 +472,7 @@ def _rewrite(proposal: str, job_post: str, analysis) -> str:
         f"{getattr(analysis, 'credibility_fact', '')}\n"
         f"Use at most this link: "
         f"{getattr(analysis, 'portfolio_link', '')}")
-    res = llm.ask(_REWRITE_SYSTEM, user, temperature=0.6, max_tokens=900)
+    res = llm.ask(_REWRITE_SYSTEM, user, temperature=0.6, max_tokens=2000)
     return res.text.strip() if res.ok else ""
 
 

@@ -199,7 +199,7 @@ def write_one(analysis: JobAnalysis, job_post: str, *,
     strengths merged) rather than two parallel drafts. The panel judges this one.
     """
     user = _one_prompt(analysis, job_post)
-    res = llm.ask(ONE_SYSTEM, user, temperature=0.75, max_tokens=1400)
+    res = llm.ask(ONE_SYSTEM, user, temperature=0.75, max_tokens=4000)
 
     bundle = ProposalBundle(prompt=user)
 
@@ -477,7 +477,7 @@ def _screening_answers(a: JobAnalysis, job_post: str, live: bool) -> list:
                 f"Questions to answer:\n" +
                 "\n".join(f"- {q}" for q in questions) +
                 f"\n\nContext: niche={a.niche}, portfolio={a.portfolio_link}")
-        res = llm.ask(_SCREEN_SYSTEM, user, temperature=0.5, max_tokens=900)
+        res = llm.ask(_SCREEN_SYSTEM, user, temperature=0.5, max_tokens=1500)
         if res.ok:
             from .analyzer import _extract_json
             data = _extract_json(res.text)

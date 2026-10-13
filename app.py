@@ -14,6 +14,9 @@ from datetime import datetime
 
 import streamlit as st
 
+from engine import env
+env.load_env()  # read .env before anything inspects keys
+
 from engine import run, llm
 from engine.panel import PERSONAS, SCORE_DIMENSIONS
 
@@ -62,13 +65,18 @@ with st.sidebar:
     st.markdown("### ⚙️ Settings")
     status = llm.status()
     if status["live"]:
-        st.success(f"LLM live: **{status['provider']}** · {status['model']}")
+        nkeys = status.get("keys", 1)
+        extra = f" · {nkeys} keys (auto-rotate)" if nkeys > 1 else ""
+        st.success(f"LLM live: **{status['provider']}** · {status['model']}{extra}")
+        if env.loaded_from():
+            st.caption(f".env: {env.loaded_from()}")
     else:
         st.warning(
             "No API key detected. The studio still works: it produces a "
             "ready-to-paste prompt plus editable scaffolds.\n\n"
-            "Set `OPENAI_API_KEY`, `GROQ_API_KEY`, `OPENROUTER_API_KEY`, or "
-            "`UPS_PROVIDER=ollama` for full prose."
+            "Put a key in `.env` (copy `.env.example`) - `GEMINI_API_KEY`, "
+            "`OPENAI_API_KEY`, `GROQ_API_KEY`, `OPENROUTER_API_KEY`, or "
+            "`UPS_PROVIDER=ollama` for a local model."
         )
 
     use_llm = st.toggle("Use LLM when available", value=True)
@@ -78,8 +86,8 @@ with st.sidebar:
     st.divider()
     st.markdown("### 🧠 Identity")
     st.caption(
-        "Facts come from `knowledge/positioning.md` and `knowledge/portfolio.md`. "
-        "Edit those files to change what the tool may claim."
+        "Facts come from `skills/upwork-proposal/references/` "
+        "(positioning.md, portfolio.md). Edit those to change what the tool may claim."
     )
     with st.expander("Checklist before sending"):
         st.markdown("""

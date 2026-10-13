@@ -8,15 +8,24 @@ env/
 
 # Secrets - never commit keys or client data
 .env
+.env.local
 *.key
 *token*
 *secret*
 *credential*
+cookies.txt
+*.har
 
 # Local outputs
 result.json
-PROPOSAL-*.md
 proposal_result.json
+PROPOSAL-*.md
+PANEL.md
+PROPOSAL-IMPROVED.md
+_*.json
+_*.txt
+_r.json
+_job.txt
 
 # OS / editor
 .DS_Store
