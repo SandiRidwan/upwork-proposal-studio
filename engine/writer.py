@@ -122,6 +122,16 @@ result, metric, or technology. If a needed fact is missing, write [ADD: ...] and
 Return ONLY the proposal text, nothing else."""
 
 
+def _skill_body() -> str:
+    """The writer SKILL.md with its YAML frontmatter stripped."""
+    text = knowledge.writer_skill()
+    if text.startswith("---"):
+        parts = text.split("---", 2)
+        if len(parts) >= 3:
+            text = parts[2]
+    return text.strip()
+
+
 def build_prompt(analysis: JobAnalysis, job_post: str,
                  variant: str = "both") -> str:
     pos = knowledge.positioning()
@@ -153,7 +163,7 @@ def build_prompt(analysis: JobAnalysis, job_post: str,
              f"({'90-130' if variant == 'short' else '220-320'} words)."
     )
 
-    return f"""{SYSTEM}
+    return f"""{_skill_body()}
 
 --- IDENTITY: POSITIONING (facts you may claim) ---
 {pos}
@@ -234,7 +244,7 @@ def _one_prompt(analysis: JobAnalysis, job_post: str) -> str:
         f"PORTFOLIO LINK (at most one): {a.portfolio_link}\n"
         f"ONE TRUE OBSERVATION: {a.one_true_observation}\n"
     )
-    return f"""{ONE_SYSTEM}
+    return f"""{_skill_body()}
 
 --- IDENTITY: POSITIONING (facts you may claim) ---
 {pos}

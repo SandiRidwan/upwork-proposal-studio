@@ -16,8 +16,19 @@ one flow:
 The two are joined sequentially, exactly as intended: **the proposal is written
 first, then it is put in front of the panel.** One proposal in, one verdict out.
 
-It is **not** a Claude Skill. It runs as a normal repo: a Python engine, a Streamlit
-UI, and a set of Markdown knowledge files that define who you are and how you write.
+They are kept **as close to the originals as possible**: both `SKILL.md` files and
+all their `references/` live here in the same folder layout, and the engine reads
+them on every run. The **only** differences are how they are invoked.
+
+| | Source repos | This repo |
+|---|---|---|
+| **Invocation** | Claude `/command` in Claude Code | API + Streamlit UI (`app.py`, `engine/cli.py`) |
+| **Sub-agents** | 7 parallel Claude sub-agents | 7 reviewers in one LLM call, or a deterministic panel with no key |
+| **Wins file** | `~/.claude/upwork-hiring-panel/wins.md` | `knowledge/wins.md` |
+
+Everything else (the five moves, the voice tiers, the seven personas, the rubric,
+the hook lab, the proof-first shape) is the same, file for file.
+
 Works with **or without** an API key.
 
 ---
@@ -121,19 +132,43 @@ type job.txt | python -m engine.cli
 
 ## Make it yours
 
-The engine is identity-agnostic. Everything specific to a person lives in
-`knowledge/`. Swap these and the tool is yours:
+The engine is identity-agnostic. Everything specific to a person lives in the two
+skill folders, kept in the **same layout the source skills use**, so the reference
+files are edited in place exactly as a Claude Skill would be:
 
 | File | What it holds |
 |---|---|
-| `knowledge/positioning.md` | Your verifiable facts, by brief type, + placement rules |
-| `knowledge/portfolio.md` | Your links, by category, + when to use each |
-| `knowledge/voice-rules.md` | Banned phrases, human-texture rules, before/after |
-| `knowledge/winning-proposals.md` | Annotated patterns that won (steal the move, not the sentence) |
-| `knowledge/client-research.md` | What to pull before writing |
+| `skills/upwork-proposal/SKILL.md` | The writer skill: identity, workflow, voice, output |
+| `skills/upwork-proposal/references/positioning.md` | Your verifiable facts, by brief type, + placement rules |
+| `skills/upwork-proposal/references/portfolio.md` | Your links, by category, + when to use each |
+| `skills/upwork-proposal/references/voice-rules.md` | Banned phrasing, human-texture tiers, before/after |
+| `skills/upwork-proposal/references/winning-proposals.md` | Annotated patterns that won (steal the move, not the sentence) |
+| `skills/upwork-proposal/references/client-research.md` | What to pull before writing |
+| `skills/upwork-hiring-panel/SKILL.md` | The panel skill: mode, seven reviewers, score, rewrite |
+| `skills/upwork-hiring-panel/references/personas.md` | The seven reviewer briefs, word for word |
+| `skills/upwork-hiring-panel/references/rubric.md` | Scores, interview chance, rejection patterns, rewrite + screening rules |
+| `skills/upwork-hiring-panel/references/winning-patterns.md` | Grounding in what clients actually see; overrides taste |
+| `skills/upwork-hiring-panel/references/hook-lab.md` | The hook loop and the blind lineup |
+
+The only two structural differences from the source skills: they are invoked by a
+Claude `/command`, this one is invoked by an **API + Streamlit UI**; and the seven
+"sub-agents" are played either by one LLM call (when a key is set) or by the
+deterministic panel in `engine/panel.py` (when not).
 
 **Hard rule the engine enforces:** it never invents a client, a result, or a metric.
 If a required fact is missing, it writes `[ADD: ...]` and asks.
+
+## Learn from your wins
+
+The panel skill says the freelancer's own hired proposals are the strongest evidence.
+Drop them in and the writer and panel both use them:
+
+```bash
+python -m engine.cli --job-file job.txt --save-win proposal.txt
+```
+
+That appends the job post and the winning proposal to `knowledge/wins.md`, dated,
+ready to be reused as a pattern.
 
 ---
 
@@ -145,15 +180,19 @@ upwork-proposal-studio/
 ├── engine/
 │   ├── __init__.py
 │   ├── analyzer.py           job post -> niche, failure mode, flags
-│   ├── writer.py             5-move structure, ONE proposal, linter
-│   ├── panel.py              7-persona review + rejection story + rewrite
+│   ├── writer.py             runs the writer SKILL.md, linter
+│   ├── panel.py              7-agent selection, rejection story, rewrite
 │   ├── pipeline.py           analyze -> write one -> 7 agents select
-│   ├── knowledge.py          loads knowledge/
+│   ├── knowledge.py          loads skills/ (the two SKILL.md + references)
 │   ├── llm.py                provider abstraction (openai/groq/openrouter/ollama)
 │   └── cli.py                command-line entry
-├── knowledge/                the identity + rule layer (edit these)
+├── skills/                   the two skills, same layout as the sources
+│   ├── upwork-proposal/SKILL.md + references/
+│   └── upwork-hiring-panel/SKILL.md + references/
+├── knowledge/
+│   └── wins.md               your own hired proposals (optional, added over time)
 ├── prompts/                  standalone prompt templates
-├── examples/                 a sample job post + expected shape
+├── examples/                 a sample job post + a weak proposal to judge
 ├── tests/                    unit tests (no key needed)
 ├── requirements.txt
 └── README.md

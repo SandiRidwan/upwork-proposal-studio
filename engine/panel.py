@@ -24,7 +24,7 @@ from __future__ import annotations
 import re
 from dataclasses import dataclass, field, asdict
 
-from . import llm
+from . import llm, knowledge
 from .analyzer import JobAnalysis
 from .writer import lint
 
@@ -320,18 +320,24 @@ def _heuristic_rejection(report: PanelReport, proposal: str) -> str:
 
 # ---------------------------------------------------------------- LLM enrich
 
-_PANEL_SYSTEM = """You are running a 7-reviewer hiring panel on an Upwork proposal.
-Each reviewer reads the proposal alone and gives a verdict plus one sentence of
-reason. Then you write the rejection story in the CLIENT's voice (first person, plain,
-under 90 words) and a merge of problems, worst first.
+_PANEL_SYSTEM = """You run the Upwork hiring panel. Seven reviewers judge the
+proposal ALONE (nobody sees anybody else's notes), each in character and in its
+fixed format. Then you merge what they found, score it, and write the rejection
+story in the CLIENT's voice. Never flatter the proposal.
 
-Return ONLY JSON:
+Follow the reviewer briefs and formats from PERSONAS, the scores from RUBRIC, and
+the grounding from WINNING-PATTERNS (that file overrides any reviewer's taste).
+
+Return ONLY this JSON:
 {
   "reviews": [{"key": "...", "verdict": "...", "reason": "..."} x7],
-  "rejection_story": "...",
-  "problems": ["...", "..."]
+  "scores": {"Hook": n, "Clarity": n, "Relevance": n, "Credibility": n,
+             "Value Proposition": n, "Interview Potential": n},
+  "interview_chance": "LOW|MEDIUM|HIGH",
+  "problems": ["...", "..."],
+  "rejection_story": "..."
 }
-Use these exact keys and allowed verdicts:
+Use these exact keys and allowed verdicts (nothing else is accepted):
   scroller: OPEN|SKIP
   hiring_client: INTERVIEW|MAYBE|NO
   budget_client: WORTH IT|NOT SURE|TOO EXPENSIVE
@@ -340,18 +346,35 @@ Use these exact keys and allowed verdicts:
   tech_lead: KNOWS IT|VAGUE|WRONG
   veteran: SHORTLIST|ARCHIVE|DECLINE
 
-Never invent facts about the client. Be blunt. Reviewers do not see each other."""
+problem quotes and reasons stay under 160 characters each. Never invent facts about
+the client or the freelancer. Be blunt. Reviewers do not see each other."""
+
+
+def _skills_block() -> str:
+    """The panel skill + its references, injected word for word."""
+    parts = []
+    for title, body in (
+        ("PERSONAS (each reviewer's brief and answer format)", knowledge.personas()),
+        ("RUBRIC (the six scores, rejection patterns, rewrite rules)",
+         knowledge.rubric()),
+        ("WINNING-PATTERNS (grounds the panel; overrides taste)",
+         knowledge.winning_patterns()),
+    ):
+        if body:
+            parts.append(f"--- {title} ---\n{body}")
+    return "\n\n".join(parts)
 
 
 def _llm_enrich(report: PanelReport, proposal: str, job_post: str,
                 analysis, with_rewrite: bool) -> None:
     user = (
-        f"JOB POST:\n{job_post[:3000]}\n\n"
-        f"PROPOSAL:\n{proposal[:4000]}\n\n"
-        f"Deterministic lint findings: "
+        f"{_skills_block()}\n\n"
+        f"--- JOB POST ---\n{job_post[:3000]}\n\n"
+        f"--- PROPOSAL ---\n{proposal[:4000]}\n\n"
+        f"--- deterministic lint already found ---\n"
         f"{[p for p in report.problems]}"
     )
-    res = llm.ask(_PANEL_SYSTEM, user, temperature=0.4, max_tokens=1200)
+    res = llm.ask(_PANEL_SYSTEM, user, temperature=0.4, max_tokens=1600)
     if not res.ok:
         return
     from .analyzer import _extract_json
@@ -360,7 +383,7 @@ def _llm_enrich(report: PanelReport, proposal: str, job_post: str,
         return
     report.used_llm = True
 
-    # merge LLM reviews (keep hueristic scores, replace reasons)
+    # merge LLM reviews (keep heuristic scores, replace reasons)
     llm_reviews = {r.get("key"): r for r in data.get("reviews", [])
                    if isinstance(r, dict)}
     for r in report.reviews:
@@ -373,10 +396,41 @@ def _llm_enrich(report: PanelReport, proposal: str, job_post: str,
             if lr.get("reason"):
                 r.reason = str(lr["reason"])[:300]
 
-    # refresh scores from possibly-updated verdicts
-    report.scores, report.interview_chance = _heuristic_scores(
-        proposal, report.reviews)
+    # prefer LLM scores when present and sane
+    llm_scores = data.get("scores")
+    if isinstance(llm_scores, dict):
+        clean = {}
+        for dim in SCORE_DIMENSIONS:
+            val = llm_scores.get(dim)
+            if isinstance(val, (int, float)) and 1 <= val <= 10:
+                clean[dim] = int(round(val))
+        if len(clean) == len(SCORE_DIMENSIONS):
+            report.scores = clean
+            avg = sum(clean.values()) / len(clean)
+            chance = ("HIGH" if avg >= 7.5 else
+                      "MEDIUM" if avg >= 5.5 else "LOW")
+            # honor the rubric: a Scroller SKIP caps at MEDIUM
+            if (any(r.key == "scroller" and r.verdict == "SKIP"
+                    for r in report.reviews) and chance == "HIGH"):
+                chance = "MEDIUM"
+            # honor the rubric: HIGH requires OPEN + INTERVIEW
+            scroller_open = any(r.key == "scroller" and r.verdict == "OPEN"
+                                for r in report.reviews)
+            hc_interview = any(r.key == "hiring_client"
+                               and r.verdict == "INTERVIEW"
+                               for r in report.reviews)
+            if chance == "HIGH" and not (scroller_open and hc_interview):
+                chance = "MEDIUM"
+            report.interview_chance = chance
+        else:
+            report.scores, report.interview_chance = _heuristic_scores(
+                proposal, report.reviews)
+    else:
+        report.scores, report.interview_chance = _heuristic_scores(
+            proposal, report.reviews)
 
+    if data.get("interview_chance") in ("LOW", "MEDIUM", "HIGH"):
+        report.interview_chance = data["interview_chance"]
     if data.get("rejection_story"):
         report.rejection_story = str(data["rejection_story"])[:800]
     if data.get("problems"):
@@ -386,18 +440,24 @@ def _llm_enrich(report: PanelReport, proposal: str, job_post: str,
         report.rewrite = _rewrite(proposal, job_post, analysis)
 
 
-_REWRITE_SYSTEM = """Rewrite the proposal using the same facts (never invent anything).
-Apply the five moves and the voice rules. Keep it 120-220 words. Return only the
-proposal text, no headings or commentary."""
+_REWRITE_SYSTEM = """Rewrite the proposal following the proof-first shape and the
+rewrite rules exactly. Same facts as the original, nothing invented. Use the
+client's own words and the job's keywords early, one hard credential with a number,
+at most one checkable proof link, then answer every client ask and close on an
+easy-to-answer question. Return only the proposal text, no headings or commentary."""
 
 
 def _rewrite(proposal: str, job_post: str, analysis) -> str:
-    user = (f"JOB POST:\n{job_post[:2500]}\n\n"
-            f"ORIGINAL:\n{proposal[:3000]}\n\n"
-            f"Use this credibility fact if it fits: "
-            f"{getattr(analysis, 'credibility_fact', '')}\n"
-            f"Use at most this link: "
-            f"{getattr(analysis, 'portfolio_link', '')}")
+    user = (
+        f"--- RUBRIC (rewrite rules) ---\n{knowledge.rubric()}\n\n"
+        f"--- WINNING-PATTERNS (proof-first shape) ---\n"
+        f"{knowledge.winning_patterns()}\n\n"
+        f"--- JOB POST ---\n{job_post[:2500]}\n\n"
+        f"--- ORIGINAL ---\n{proposal[:3000]}\n\n"
+        f"Credibility fact to use if it fits: "
+        f"{getattr(analysis, 'credibility_fact', '')}\n"
+        f"Use at most this link: "
+        f"{getattr(analysis, 'portfolio_link', '')}")
     res = llm.ask(_REWRITE_SYSTEM, user, temperature=0.6, max_tokens=900)
     return res.text.strip() if res.ok else ""
 

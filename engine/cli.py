@@ -15,7 +15,24 @@ import json
 import sys
 
 from .pipeline import run
-from . import llm
+from . import llm, knowledge
+
+
+def _save_win(job_post: str, proposal: str) -> None:
+    """Append a hired win to knowledge/wins.md (the 'learn from results' rule)."""
+    from datetime import datetime
+    from pathlib import Path
+    path = Path(__file__).resolve().parent.parent / "knowledge" / "wins.md"
+    path.parent.mkdir(parents=True, exist_ok=True)
+    stamp = datetime.now().strftime("%Y-%m-%d")
+    block = (
+        f"\n\n## {stamp} - hired\n\n"
+        f"**Job post**\n\n> " + job_post.strip().replace("\n", "\n> ") + "\n\n"
+        f"**Proposal sent**\n\n> " + proposal.strip().replace("\n", "\n> ") + "\n"
+    )
+    with open(path, "a", encoding="utf-8") as f:
+        f.write(block)
+    print(f"Appended win to {path}")
 
 
 def main(argv=None) -> int:
@@ -28,7 +45,21 @@ def main(argv=None) -> int:
     ap.add_argument("--no-llm", action="store_true", help="heuristics only")
     ap.add_argument("--rewrite", action="store_true", help="panel also rewrites")
     ap.add_argument("--json", action="store_true", help="print raw JSON")
+    ap.add_argument("--save-win", metavar="PROPOSAL_FILE",
+                    help="append a hired proposal (file) + this job to "
+                         "knowledge/wins.md")
+    ap.add_argument("--show-skills", action="store_true",
+                    help="print the loaded skill file paths and exit")
     args = ap.parse_args(argv)
+
+    if args.show_skills:
+        import json as _json
+        from pathlib import Path
+        root = Path(__file__).resolve().parent.parent / "skills"
+        listing = {str(p.relative_to(root.parent)): p.stat().st_size
+                   for p in sorted(root.rglob("*.md"))}
+        print(_json.dumps(listing, indent=2))
+        return 0
 
     def read(path, fallback=""):
         if not path:
@@ -45,6 +76,10 @@ def main(argv=None) -> int:
         print("No job post provided. Use --job-file or pipe text on stdin.",
               file=sys.stderr)
         return 2
+
+    if args.save_win:
+        _save_win(job, read(args.save_win))
+        return 0
 
     result = run(
         job,

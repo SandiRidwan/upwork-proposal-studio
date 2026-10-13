@@ -51,10 +51,10 @@ Write BOTH a SHORT variant (90-130 words) and a PROCESS variant (220-320 words).
 Label them "=== SHORT VARIANT ===" and "=== PROCESS VARIANT ===".
 
 My positioning (facts I may claim):
-<paste knowledge/positioning.md>
+<paste skills/upwork-proposal/references/positioning.md>
 
 My portfolio (links I may use, at most one):
-<paste knowledge/portfolio.md>
+<paste skills/upwork-proposal/references/portfolio.md>
 
 Job analysis:
 <paste output of prompt 01>

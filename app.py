@@ -296,12 +296,25 @@ with tab_review:
 with tab_knowledge:
     from engine import knowledge as kb
     st.caption(
-        "These files are the identity + rule layer. Edit them to change what the "
-        "tool may claim and how it writes. The writer reads them every run.")
-    tabs = st.tabs(["Positioning", "Portfolio", "Voice rules",
-                    "Winning patterns", "Client research"])
-    files = [kb.positioning(), kb.portfolio(), kb.voice(), kb.wins(),
-             kb.research()]
+        "These are the same files the two source skills ship, kept in the same "
+        "layout under `skills/`. Edit them to change what the tool may claim and "
+        "how it writes. The engine reads them on every run.")
+
+    which = st.radio(
+        "Skill", ["upwork-proposal (writer)", "upwork-hiring-panel (7 agents)"],
+        horizontal=True, label_visibility="collapsed")
+
+    if which.startswith("upwork-proposal"):
+        tabs = st.tabs(["SKILL.md", "Positioning", "Portfolio", "Voice rules",
+                        "Winning corpus", "Client research"])
+        files = [kb.writer_skill(), kb.positioning(), kb.portfolio(),
+                 kb.voice(), kb.wins(), kb.research()]
+    else:
+        tabs = st.tabs(["SKILL.md", "Personas", "Rubric", "Winning patterns",
+                        "Hook lab"])
+        files = [kb.panel_skill(), kb.personas(), kb.rubric(),
+                 kb.winning_patterns(), kb.hook_lab()]
+
     for t, content in zip(tabs, files):
         with t:
             st.markdown(content)

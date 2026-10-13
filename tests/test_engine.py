@@ -120,17 +120,93 @@ class TestPanel(unittest.TestCase):
 
 class TestKnowledge(unittest.TestCase):
     def test_files_load(self):
-        self.assertIn("Sandi Ridwan", knowledge.positioning())
+        self.assertIn("Sandi", knowledge.positioning())
         self.assertIn("github.com/SandiRidwan", knowledge.portfolio())
         self.assertIn("banned", knowledge.voice().lower())
 
     def test_no_fake_placeholders_in_fact_tables(self):
-        # the hard rule: fact tables must not contain unfinished [ADD placeholders.
-        # (The word [ADD appears in prose explaining the rule, so scope to the
-        # table rows only: lines starting with "| ".)
+        # fact tables must not contain unfinished [ADD placeholders
         rows = [l for l in knowledge.positioning().splitlines()
                 if l.strip().startswith("|")]
         self.assertNotIn("[ADD", "\n".join(rows))
+
+
+class TestSkillShape(unittest.TestCase):
+    """The repo mirrors the two source skills' file layout and content."""
+
+    def test_writer_skill_frontmatter(self):
+        s = knowledge.writer_skill()
+        self.assertTrue(s.startswith("---\nname: upwork-proposal\n"))
+        for key in ("description:", "mode: api-ui"):
+            self.assertIn(key, s)
+
+    def test_panel_skill_frontmatter(self):
+        s = knowledge.panel_skill()
+        self.assertTrue(s.startswith("---\nname: upwork-hiring-panel\n"))
+        for key in ("description:", "argument-hint:", "license: MIT",
+                    "mode: api-ui"):
+            self.assertIn(key, s)
+
+    def test_writer_has_five_moves_and_voice(self):
+        s = knowledge.writer_skill()
+        for marker in ("## Identity", "## Workflow", "## Voice",
+                       "## Output format", "## Reference files",
+                       "Five moves"):
+            self.assertIn(marker, s)
+        self.assertIn("### 4. Produce two variants, always", s)
+
+    def test_panel_has_seven_reviewers_and_steps(self):
+        s = knowledge.panel_skill()
+        for marker in ("## 2. Seven reviewers, alone", "## 3. Score it",
+                       "## 4. Why it gets skipped or rejected",
+                       "## 5. Rewrite it", "## 5b. Test the hook until it wins",
+                       "## Rules"):
+            self.assertIn(marker, s)
+
+    def test_personas_seven_briefs_with_verdict_and_score(self):
+        p = knowledge.personas()
+        for who in ("The Scroller", "The Hiring Client",
+                    "The Budget-Conscious Client", "The Competing Freelancer",
+                    "The Skeptic", "The Technical Lead", "The Upwork Veteran"):
+            self.assertIn(who, p)
+        self.assertIn("## 1. The Scroller", p)
+        briefs = p.split("\n## ")[1:]
+        self.assertEqual(len(briefs), 7)
+        for brief in briefs:
+            self.assertIn("VERDICT:", brief)
+            self.assertIn("SCORE: n/10", brief)
+
+    def test_scroller_sees_only_preview(self):
+        scroller = knowledge.personas().split("## 1. The Scroller")[1].split("## 2.")[0]
+        self.assertIn("Never the full proposal", scroller)
+
+    def test_rubric_six_scores_and_rules(self):
+        r = knowledge.rubric()
+        for score in ("Hook", "Clarity", "Relevance", "Credibility",
+                      "Value Proposition", "Interview Potential"):
+            self.assertIn(f"**{score}**", r)
+        for marker in ("## Interview chance", "## Common rejection patterns",
+                       "## Rewrite rules", "## Screening answer rules"):
+            self.assertIn(marker, r)
+
+    def test_winning_patterns_and_hook_lab(self):
+        wp = knowledge.winning_patterns()
+        self.assertIn("## The proof-first shape", wp)
+        self.assertIn("## Not opened? Check these", wp)
+        hl = knowledge.hook_lab()
+        self.assertIn("## The loop", hl)
+        self.assertIn("**Blind lineup**", hl)
+        self.assertIn("## Competitor previews for the lineup", hl)
+        self.assertIn("HYPOTHETICAL", hl)
+        self.assertIn("9 or 10 solo AND ranks in the top 2", hl)
+
+    def test_stays_on_upwork(self):
+        self.assertIn("off Upwork", knowledge.panel_skill())
+        self.assertIn("Stay on Upwork", knowledge.rubric())
+
+    def test_never_invents(self):
+        self.assertIn("Never invent", knowledge.panel_skill())
+        self.assertIn("[ADD: ...]", knowledge.panel_skill())
 
 
 class TestPipeline(unittest.TestCase):
@@ -156,14 +232,25 @@ class TestPipeline(unittest.TestCase):
     def test_prompt_built(self):
         a = analyze(JOB_ANTIBOT)
         p = build_prompt(a, JOB_ANTIBOT)
-        self.assertIn("FIVE MOVES", p)
+        # build_prompt is the optional two-variant writer
         self.assertIn("SHORT VARIANT", p)
+        self.assertIn("PROCESS VARIANT", p)
+        self.assertIn("--- VOICE RULEBOOK ---", p)
 
     def test_write_one_produces_single(self):
         a = analyze(JOB_ANTIBOT)
         b = write_one(a, JOB_ANTIBOT, include_screening=False)
         self.assertEqual(len(b.variants), 1)
         self.assertTrue(b.primary.body)
+
+    def test_prompt_embeds_the_skill(self):
+        a = analyze(JOB_ANTIBOT)
+        p = build_prompt(a, JOB_ANTIBOT)
+        # the real SKILL.md body must be in the prompt, not a hand-written copy
+        self.assertIn("Write proposals that win by reducing the client's hiring risk",
+                      p)
+        self.assertIn("## Workflow", p)
+        self.assertIn("## Voice", p)
 
     def test_skeletons_are_clean(self):
         result = run(JOB_ANALYSIS, use_llm=False)
