@@ -1,0 +1,6 @@
+# Upwork Proposal Studio - dependencies
+#
+# The core engine has ZERO required dependencies (stdlib only).
+# Streamlit is only needed for the web UI. An LLM key is optional.
+
+streamlit>=1.30

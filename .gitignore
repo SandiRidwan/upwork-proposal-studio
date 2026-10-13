@@ -1,0 +1,25 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+env/
+
+# Secrets - never commit keys or client data
+.env
+*.key
+*token*
+*secret*
+*credential*
+
+# Local outputs
+result.json
+PROPOSAL-*.md
+proposal_result.json
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/

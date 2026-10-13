@@ -1,0 +1,161 @@
+"""Unit tests. No API key, no network required."""
+
+import os
+import unittest
+
+# force prompt mode so tests never call an API even if a key is present
+os.environ["UPS_LLM_MODE"] = "prompt"
+
+from engine.analyzer import analyze
+from engine.writer import write, lint, build_prompt
+from engine.panel import review, _heuristic_reviews, _heuristic_scores
+from engine.pipeline import run
+from engine import knowledge
+
+
+JOB_ANTIBOT = """We need someone to scrape product data from a large e-commerce site.
+We tried Scrapy and a couple of freelancers but we keep getting blocked by Cloudflare.
+Need 20,000 products with price, title, description. Output to CSV. Ongoing if it works.
+This week if possible."""
+
+JOB_ANALYSIS = """I have a sales dataset in Excel and I need a dashboard that shows
+monthly trends and tells me where my margin is leaking. Must be accurate, I don't
+trust the numbers my last guy gave me. Power BI or similar. No rush, planning for
+next month."""
+
+JOB_AUTOMATION = """Looking for someone to automate our lead flow. Right now someone
+copies new form submissions into Airtable by hand every day. We want it to enrich the
+company info and route each lead to the right rep in Slack. Long term relationship."""
+
+
+class TestAnalyzer(unittest.TestCase):
+    def test_antibot_niche(self):
+        a = analyze(JOB_ANTIBOT)
+        self.assertEqual(a.niche, "A")
+        self.assertEqual(a.urgency, "high")
+        self.assertIn("blocked", a.failure_mode.lower())
+
+    def test_analysis_niche(self):
+        a = analyze(JOB_ANALYSIS)
+        self.assertEqual(a.niche, "C")
+        self.assertEqual(a.urgency, "low")
+
+    def test_automation_niche(self):
+        a = analyze(JOB_AUTOMATION)
+        self.assertIn(a.niche, ("B", "E"))
+
+    def test_red_flag_offplatform(self):
+        a = analyze("Simple task. Contact me at my email outside upwork. $10 fixed.")
+        self.assertIn("off_platform", a.red_flags)
+
+    def test_defaults_present(self):
+        a = analyze(JOB_ANTIBOT)
+        self.assertTrue(a.credibility_fact)
+        self.assertTrue(a.portfolio_link)
+        self.assertIn(a.variant, ("short", "process"))
+
+
+class TestLint(unittest.TestCase):
+    def test_catches_banned(self):
+        issues = lint("I am a professional developer. Looking forward to hearing "
+                      "from you!")
+        rules = {i["rule"] for i in issues}
+        self.assertIn("banned_phrase", rules)
+        self.assertIn("exclamation", rules)
+
+    def test_catches_emoji_and_dash(self):
+        rules = {i["rule"] for i in lint("Great work \U0001F600 and fast \u2014 done.")}
+        self.assertIn("emoji", rules)
+        self.assertIn("em_dash", rules)
+
+    def test_catches_pronoun_ratio(self):
+        bodies = "I I I my my me you. " * 3
+        rules = {i["rule"] for i in lint(bodies)}
+        self.assertIn("pronoun_ratio", rules)
+
+    def test_clean_proposal_passes(self):
+        clean = (
+            "Cloudflare blocking you usually means the wrong path. Most sites leave "
+            "one open. I map which ones answer before quoting. I've done this on "
+            "government and travel sites past TLS fingerprinting. Send me one URL "
+            "and I'll tell you tonight whether it's a wall or a door, free. "
+            "What's the site?"
+        )
+        hard = [i for i in lint(clean)
+                if i["rule"] in ("banned_phrase", "exclamation", "emoji",
+                                 "ai_tell", "em_dash")]
+        self.assertEqual(hard, [])
+
+
+class TestPanel(unittest.TestCase):
+    def test_scroller_skips_bad_opener(self):
+        bad = ("I am a professional web scraping specialist with 4 years of "
+               "experience. I can deliver high quality work.")
+        reviews = {r.key: r for r in _heuristic_reviews(bad, JOB_ANTIBOT)}
+        self.assertEqual(reviews["scroller"].verdict, "SKIP")
+
+    def test_scroller_opens_good_opener(self):
+        good = ("Cloudflare blocking your scraper usually means the wrong path, "
+                "not a real wall. Send me one URL.")
+        reviews = {r.key: r for r in _heuristic_reviews(good, JOB_ANTIBOT)}
+        self.assertEqual(reviews["scroller"].verdict, "OPEN")
+
+    def test_scores_and_chance(self):
+        good = ("Cloudflare blocking you usually means the wrong path. Most sites "
+                "leave one open. I've mapped 202 to 200 on a hotel API before. "
+                "Send me one URL and I'll check free tonight. What's the site?")
+        reviews = _heuristic_reviews(good, JOB_ANTIBOT)
+        scores, chance = _heuristic_scores(good, reviews)
+        self.assertIn(chance, ("LOW", "MEDIUM", "HIGH"))
+        self.assertEqual(set(scores), {"Hook", "Clarity", "Relevance",
+                                       "Credibility", "Value Proposition",
+                                       "Interview Potential"})
+
+    def test_review_returns_report(self):
+        rep = review("Cloudflare blocking you means the wrong path. One URL?",
+                     JOB_ANTIBOT, use_llm=False)
+        self.assertEqual(len(rep.reviews), 7)
+        self.assertTrue(rep.rejection_story)
+
+
+class TestKnowledge(unittest.TestCase):
+    def test_files_load(self):
+        self.assertIn("Sandi Ridwan", knowledge.positioning())
+        self.assertIn("github.com/SandiRidwan", knowledge.portfolio())
+        self.assertIn("banned", knowledge.voice().lower())
+
+    def test_no_fake_placeholders_in_fact_tables(self):
+        # the hard rule: fact tables must not contain unfinished [ADD placeholders.
+        # (The word [ADD appears in prose explaining the rule, so scope to the
+        # table rows only: lines starting with "| ".)
+        rows = [l for l in knowledge.positioning().splitlines()
+                if l.strip().startswith("|")]
+        self.assertNotIn("[ADD", "\n".join(rows))
+
+
+class TestPipeline(unittest.TestCase):
+    def test_full_run(self):
+        result = run(JOB_ANTIBOT, use_llm=False, review_variants=True)
+        d = result.to_dict()
+        self.assertEqual(d["analysis"]["niche"], "A")
+        self.assertGreaterEqual(len(d["proposal"]["variants"]), 2)
+        self.assertEqual(len(d["panels"]), len(d["proposal"]["variants"]))
+        self.assertFalse(d["meta"]["writer_used_llm"])
+
+    def test_prompt_built(self):
+        a = analyze(JOB_ANTIBOT)
+        p = build_prompt(a, JOB_ANTIBOT)
+        self.assertIn("FIVE MOVES", p)
+        self.assertIn("SHORT VARIANT", p)
+
+    def test_skeletons_are_clean(self):
+        result = run(JOB_ANALYSIS, use_llm=False)
+        for v in result.proposal.variants:
+            hard = [i for i in v.lint
+                    if i["rule"] in ("banned_phrase", "exclamation", "emoji",
+                                     "ai_tell", "pronoun_ratio")]
+            self.assertEqual(hard, [], f"{v.label} has hard lint: {hard}")
+
+
+if __name__ == "__main__":
+    unittest.main()
