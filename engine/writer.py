@@ -341,6 +341,8 @@ def _skeleton(a: JobAnalysis, variant: str) -> Variant:
     obs = a.one_true_observation
     link = a.portfolio_link
     tech = _TECH_DETAIL.get(a.niche, _TECH_DETAIL["A"])
+    closing = _CLOSING.get(a.niche, _CLOSING["A"])
+    freeze = _FREEZE.get(a.niche, _FREEZE["A"])
 
     symptom_clause = (
         f'You named "{a.named_symptom}", which usually points at '
@@ -349,27 +351,44 @@ def _skeleton(a: JobAnalysis, variant: str) -> Variant:
 
     if variant == "short":
         body = (
-            f"{a.failure_mode} That is usually not a wall, it is the wrong door. "
-            f"{tech} Send one URL or one sample file and you'll know tonight "
-            f"whether it's a two-hour job or a two-day one, free. "
-            f"{obs}\n\n"
-            f"What is the target, and what has already been tried?"
+            f"{a.failure_mode} {freeze} {tech} "
+            f"Send one example and you'll know tonight whether it's a "
+            f"two-hour job or a two-day one, free. {obs}\n\n"
+            f"{closing}"
         )
         return Variant("short", "Short variant", body, len(body.split()))
 
     body = (
         f"{a.failure_mode}\n\n"
-        f"Before quoting anything, the shape of the problem gets checked, not "
-        f"the symptom. {symptom_clause}one specific layer, and it is rarely the "
-        f"layer people assume. Getting that wrong costs days.\n\n"
+        f"Before quoting anything, I check the shape of your problem, not the "
+        f"symptom. {symptom_clause}one specific layer, and it is rarely the "
+        f"layer people assume. Getting that wrong costs you days.\n\n"
         f"{tech} {a.credibility_fact}\n\n"
         f"{obs}\n\n"
         f"One reference repo that matches: {link}\n\n"
-        f"To scope this properly, two things help. What is the exact source, and "
-        f"roughly what volume are we talking about? With those, you'll get the "
-        f"approach and a realistic timeline before committing to anything."
+        f"To scope this properly, one thing helps. {closing}"
     )
     return Variant("process", "Process variant", body, len(body.split()))
+
+
+# A niche-aware reframe of the failure mode (the anti-bot "wall vs door" line
+# only fits anti-bot jobs).
+_FREEZE = {
+    "A": "That is usually not a wall, it is the wrong door.",
+    "B": "That usually isn't the first run, it's month three.",
+    "C": "That is almost always a join-key problem before it's a chart problem.",
+    "D": "That usually isn't the feature, it's what happens under load.",
+    "E": "That is almost always a coverage problem before it's a volume problem.",
+}
+
+# A niche-aware closing question (five move 5).
+_CLOSING = {
+    "A": "What's the target, and what has already been tried?",
+    "B": "What breaks most often today, the fetch or the hand-off?",
+    "C": "What are the two sources, and roughly how many records are we joining?",
+    "D": "What's the endpoint, and how many calls a day do you expect?",
+    "E": "What's the source, and roughly how many records are we talking about?",
+}
 
 
 # A precise, niche-specific insider detail for the deterministic scaffold.
@@ -380,9 +399,9 @@ _TECH_DETAIL = {
     "B": ("The failure mode that kills these is a field rename on the source "
           "site that nobody notices. So errors get logged with a reason and "
           "surfaced, never silently swallowed."),
-    "C": ("The visible price column is often the 'Was' price, not what the "
-          "customer pays. Auditing what each field actually contains comes "
-          "before any chart."),
+    "C": ("The trap is joining two datasets on a column that looks the same and "
+          "isn't. IDs, codes and labels drift between sources, so the join key "
+          "gets checked before any list or chart is built."),
     "D": ("Serving under load usually breaks on the boring parts: connection "
           "pooling, health checks, and what happens when the upstream "
           "hiccups."),

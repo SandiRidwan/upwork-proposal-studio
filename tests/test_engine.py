@@ -27,6 +27,16 @@ JOB_AUTOMATION = """Looking for someone to automate our lead flow. Right now som
 copies new form submissions into Airtable by hand every day. We want it to enrich the
 company info and route each lead to the right rep in Slack. Long term relationship."""
 
+# Real Upwork brief: EPA Envirofacts/ECHO + US census + maps. This must NOT be
+# read as an anti-bot job just because it mentions "scraping".
+JOB_EPA = """Summary: Using EPA databases (Envirofacts, ECHO, etc.) identify wastewater
+treatment plants in the US and extract data such as state, city, discharge location and
+permit limits. Be able to create lists of plants that meet certain criteria. Be able to
+cross reference EPA data with US census data. Be able to create maps of US and individual
+states showing locations of plants in each category. The task requires proficiency in
+data extraction and environmental science. The ideal candidate will have experience with
+data mining and data scraping, and be able to work with Python and ETL processes."""
+
 
 class TestAnalyzer(unittest.TestCase):
     def test_antibot_niche(self):
@@ -43,6 +53,21 @@ class TestAnalyzer(unittest.TestCase):
     def test_automation_niche(self):
         a = analyze(JOB_AUTOMATION)
         self.assertIn(a.niche, ("B", "E"))
+
+    def test_epa_job_is_not_antibot(self):
+        # "extract" and "data scraping" appear, but this is a data/ETL/geo job
+        a = analyze(JOB_EPA)
+        self.assertNotEqual(a.niche, "A",
+                            "EPA ETL job must not be read as anti-bot")
+        self.assertIn(a.niche, ("C", "D", "B"))
+        # and the failure mode must describe scattered sources, not "blocked"
+        self.assertNotIn("blocked", a.failure_mode.lower())
+
+    def test_antibot_still_wins_when_target_is_defended(self):
+        a = analyze(
+            "The site is behind Cloudflare and our scraper keeps getting blocked "
+            "with 403. We tried Scrapy and Selenium.")
+        self.assertEqual(a.niche, "A")
 
     def test_red_flag_offplatform(self):
         a = analyze("Simple task. Contact me at my email outside upwork. $10 fixed.")
@@ -99,6 +124,20 @@ class TestPanel(unittest.TestCase):
                 "not a real wall. Send me one URL.")
         reviews = {r.key: r for r in _heuristic_reviews(good, JOB_ANTIBOT)}
         self.assertEqual(reviews["scroller"].verdict, "OPEN")
+
+    def test_scroller_opens_data_domain_hook(self):
+        # a strong data/ETL opener must not be read as weak
+        good = ("Joining EPA data to census data is where keys drift and the map "
+                "comes out quietly wrong. Two sources, one join key check.")
+        reviews = {r.key: r for r in _heuristic_reviews(good, "")}
+        self.assertEqual(reviews["scroller"].verdict, "OPEN")
+
+    def test_competitor_sees_data_specifics(self):
+        good = ("The join key drifts between sources, so the facility id and "
+                "county code get checked before any map. I did this on 18,100 "
+                "records.")
+        reviews = {r.key: r for r in _heuristic_reviews(good, "")}
+        self.assertIn(reviews["competitor"].verdict, ("I WIN", "TOSS-UP"))
 
     def test_scores_and_chance(self):
         good = ("Cloudflare blocking you usually means the wrong path. Most sites "

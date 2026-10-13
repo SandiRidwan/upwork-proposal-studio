@@ -31,13 +31,19 @@ from . import llm
 NICHE_SIGNALS = {
     "A": {  # anti-bot / hard-target scraping
         "keywords": [
-            "scrap", "scraper", "scraping", "crawl", "crawler", "extract",
+            "scrap", "scraper", "scraping", "crawl", "crawler",
             "web data", "captcha", "cloudflare", "akamai", "datadome",
             "blocked", "bypass", "anti-bot", "antibbot", "rotating proxy",
             "proxies", "selenium", "playwright", "puppeteer", "headless",
-            "bot detection", "tls", "fingerprint", "login wall", "403",
-            "marketplace", "linkedin", "amazon", "indeed", "zillow",
+            "bot detection", "tls fingerprint", "fingerprint", "login wall",
+            "403", "rate limit", "ip block", "banned", "marketplace",
+            "linkedin", "amazon", "indeed", "zillow",
         ],
+        # words that only hint at scraping, not at a defended target. Kept
+        # separate so a plain "extract data from a public API" job does not
+        # get misread as an anti-bot fight.
+        "weak": ["extract", "extraction", "data mining", "data mining",
+                 "web scraping", "harvest"],
         "weight": 1.0,
     },
     "B": {  # automation / pipeline / enrichment
@@ -46,7 +52,8 @@ NICHE_SIGNALS = {
             "integration", "zapier", "make.com", "n8n", "airtable", "notion",
             "webhook", "api connection", "sync", "enrich", "enrichment",
             "crm", "hubspot", "salesforce", "sheets", "google sheets",
-            "recurring", "scheduled", "run daily", "ongoing",
+            "recurring", "scheduled", "run daily", "ongoing", "etl",
+            "etl processes", "scheduled job", "runs itself", "babysit",
         ],
         "weight": 1.0,
     },
@@ -57,7 +64,10 @@ NICHE_SIGNALS = {
             "kpi", "sql", "power bi", "tableau", "looker", "streamlit",
             "pandas", "data cleaning", "data quality", "forecast", "trend",
             "excel report", "pivot", "cohort", "ab test", "a/b test",
-            "statistical", "regression",
+            "statistical", "regression", "census", "dataset", "cross reference",
+            "cross-reference", "join", "map", "maps", "mapping", "geospatial",
+            "gis", "choropleth", "segmentation", "categories", "criteria",
+            "environmental", "research",
         ],
         "weight": 1.0,
     },
@@ -66,6 +76,7 @@ NICHE_SIGNALS = {
             "api", "rest api", "fastapi", "flask", "backend", "docker",
             "deploy", "deployment", "server", "cloud", "aws", "gcp",
             "postgres", "database", "microservice", "endpoint", "saas",
+            "envirofacts", "echo", "data warehouse", "ingest", "postgresql",
         ],
         "weight": 1.0,
     },
@@ -147,14 +158,35 @@ NICHE_LABEL = {
 # ---------------------------------------------------------------- heuristic core
 
 def _score_niches(text: str) -> dict:
+    """
+    Score each niche by keyword hits, weighted by specificity.
+
+    Two fixes over a naive sum:
+    - multi-word phrases count for more (they are more specific)
+    - 'weak' hints (extract, data mining) count for little, so a plain
+      public-API/ETL job is not misread as an anti-bot fight
+    """
     low = text.lower()
     scores = {}
     for niche, spec in NICHE_SIGNALS.items():
         s = 0.0
         for kw in spec["keywords"]:
             if kw in low:
-                s += spec["weight"] * (1.0 + (len(kw.split()) - 1) * 0.3)
+                s += spec["weight"] * (1.0 + (len(kw.split()) - 1) * 0.35)
+        for kw in spec.get("weak", []):
+            if kw in low:
+                s += spec["weight"] * 0.4
         scores[niche] = round(s, 2)
+
+    # A (anti-bot) is only the answer when a defended-target signal is present.
+    # "scraping"/"extract" alone is not evidence of an anti-bot fight.
+    strong_a = [kw for kw in NICHE_SIGNALS["A"]["keywords"]
+                if kw in low and kw not in ("scrap", "scraper", "scraping",
+                                            "crawl", "crawler", "marketplace",
+                                            "linkedin", "amazon", "indeed",
+                                            "zillow")]
+    if not strong_a and scores.get("A", 0) > 0:
+        scores["A"] = round(scores["A"] * 0.35, 2)
     return scores
 
 
@@ -263,12 +295,13 @@ def _default_credibility(niche: str) -> str:
              "unguarded path rather than solving the challenge.",
         "B": "Runs pipelines that alert on their own failures and log the "
              "reason, so month three does not go silently wrong.",
-        "C": "Caught a silent price-column trap before it reached the client, "
-             "then shipped the dashboard a stakeholder could click through.",
+        "C": "On a set of 18,100 records I caught a silent data trap before it "
+             "reached the client, then shipped the dashboard they could click "
+             "through.",
         "D": "Ships REST APIs with validation, pagination, and health checks "
              "that survive a real deploy, not just localhost.",
         "E": "Measures coverage before promising volume, after finding a path "
-             "that looked complete and only reached part of the catalogue.",
+             "that looked complete and only reached about 14% of the catalogue.",
     }[niche]
 
 
@@ -277,6 +310,19 @@ def _heuristic_failure_mode(text: str, niche: str) -> str:
     if any(k in low for k in ["blocked", "captcha", "403", "cloudflare",
                               "akamai", "datadome", "anti-bot"]):
         return "They tried scraping and the target site blocked them."
+    if any(k in low for k in ["cross reference", "cross-reference",
+                              "crossreference", "join with", "combine with",
+                              "match with", "link to"]):
+        return ("The data lives in separate sources and nobody has joined it "
+                "into one usable picture yet.")
+    if any(k in low for k in ["permit limits", "permit limit", "discharge",
+                              "regulatory", "compliance", "permit",
+                              "envirofacts", "echo ", "census"]):
+        return ("The records they need are public but scattered, and turning "
+                "them into a list or a map takes a specialist.")
+    if any(k in low for k in ["map", "maps", "mapping", "geospatial",
+                              "visualise locations", "locations of"]):
+        return "They can see the raw data but not where anything actually is."
     if any(k in low for k in ["manual", "copy paste", "copy-paste",
                               "spend hours", "waste time", "by hand"]):
         return "Their workflow is manual and eating someone's week."
@@ -286,6 +332,9 @@ def _heuristic_failure_mode(text: str, niche: str) -> str:
     if any(k in low for k in ["don't trust", "can't trust", "wrong numbers",
                               "inaccurate", "not sure if"]):
         return "They cannot trust the numbers they already have."
+    if any(k in low for k in ["etl", "pipeline", "scheduled", "keep running",
+                              "recurring", "without us"]):
+        return "Something that should run itself still needs a human."
     if niche == "E":
         return "Their current lead or market data is stale or incomplete."
     if niche == "C":
@@ -299,7 +348,8 @@ def _heuristic_symptom(text: str) -> str:
     low = text.lower()
     for kw in ["blocked", "captcha", "403", "rate limit", "banned", "ip block",
                "cloudflare", "timeout", "crash", "error", "missing", "inaccurate",
-               "manual", "slow", "stale"]:
+               "manual", "slow", "stale", "cross reference", "scattered",
+               "separate sources", "permit limits", "discharge", "locations"]:
         if kw in low:
             return kw
     return ""

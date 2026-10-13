@@ -144,10 +144,18 @@ def _heuristic_reviews(proposal: str, job_post: str) -> list:
     # 1 Scroller
     hook_bad = any(b in opening for b in [
         "i am a", "i'm a", "i have", "i've been", "my name", "hello",
-        "hi,", "dear", "i read", "i came across", "as a professional"])
+        "hi,", "dear", "i read", "i came across", "as a professional",
+        "years of experience", "i am a professional", "i can help you",
+        "i would like to", "i specialize in"])
+    # A strong hook names the client's problem, a failure, or a specific
+    # technical risk. Broad enough to cover data/ETL jobs, not just anti-bot.
     strong_hook = bool(re.search(
-        r"\b(block|wall|door|trap|wrong|fail|stuck|break|risk|problem)\b",
-        opening))
+        r"\b(block|wall|door|trap|wrong|fail|failed|failure|stuck|stuck|break|"
+        r"breaks|broken|risk|problem|drift|drifts|mismatch|lie|lies|lying|"
+        r"silently|quietly|cost|costs|leak|leaking|lose|lost|miss|missing|"
+        r"scattered|separate|doesn't|does not|isn't|is not|hard part|"
+        r"real problem|the catch|the issue)\b",
+        opening, re.I))
     scroller = "SKIP" if (hook_bad or not strong_hook or len(opening) < 25) else "OPEN"
     out.append(Review(
         "scroller", "The Scroller", scroller,
@@ -189,9 +197,15 @@ def _heuristic_reviews(proposal: str, job_post: str) -> list:
         "No clear first step or scope for the money."))
 
     # 4 Competitor
-    specific = bool(re.search(r"\b(200|202|403|405|/_next|viewstate|tls|ja3|"
-                              r"signature|slug|trailing slash|endpoint|"
-                              r"price column|coverage|sitemap|api)\b", low))
+    specific = bool(re.search(
+        r"\b(200|202|403|405|/_next|viewstate|tls|ja3|"
+        r"signature|slug|trailing slash|endpoint|"
+        r"price column|coverage|sitemap|api|"
+        # data / analytics / geospatial signals
+        r"join|join key|join keys|primary key|schema|census|permit|permit number|"
+        r"facility id|county code|coordinate|coordinates|latitude|longitude|"
+        r"geospatial|gis|choropleth|dedupe|deduplication|normalise|normalize|"
+        r"etl|ingest|data quality|audit|cartesian)\b", low))
     cred = bool(re.search(r"\d{2,}", proposal))  # a real number somewhere
     comp = "I WIN" if (specific and cred) else (
         "TOSS-UP" if specific else "THEY WIN")
