@@ -362,22 +362,39 @@ def _portfolio_for(niche: str, text: str) -> str:
     """
     Pick the portfolio link, considering context within a niche.
 
-    Niche B covers both pipeline work and AI-agent work; for an AI brief the
-    agent repo is the right proof, not the enrichment pipeline.
+    Niche B covers pipelines, AI agents, RAG and n8n. The closest proof wins:
+    an n8n brief gets the workflow pack, a RAG brief gets the knowledge service,
+    any other agent/LLM brief gets the orchestrator.
     """
     low = text.lower()
-    if niche == "B" and any(h in low for h in _AI_HINTS):
-        return "https://github.com/SandiRidwan/agent-orchestrator-lab"
+    if niche == "B":
+        if "n8n" in low or "zapier" in low or "make.com" in low:
+            return "https://github.com/SandiRidwan/n8n-ai-workflow-pack"
+        if "rag" in low or "retrieval" in low or "knowledge base" in low or \
+                "vector database" in low or "vector store" in low:
+            return "https://github.com/SandiRidwan/rag-knowledge-service"
+        if any(h in low for h in _AI_HINTS):
+            return "https://github.com/SandiRidwan/agent-orchestrator-lab"
     return _default_portfolio(niche)
 
 
 def _credibility_for(niche: str, text: str) -> str:
     """Niche credibility, with an AI-specific line when the brief is about agents."""
     low = text.lower()
-    if niche == "B" and any(h in low for h in _AI_HINTS):
-        return ("Built a production-shaped LLM agent: typed tools that reject a bad "
-                "call instead of running it, human approval before anything "
-                "sensitive, and a scored eval at 100% tool accuracy.")
+    if niche == "B":
+        if "n8n" in low or "zapier" in low or "make.com" in low:
+            return ("Built three n8n AI workflows around the safe patterns: "
+                    "validate before the LLM call, dedupe before any write, and an "
+                    "approval gate that fails closed on refunds.")
+        if "rag" in low or "retrieval" in low or "knowledge base" in low or \
+                "vector database" in low or "vector store" in low:
+            return ("Built a RAG service that answers from your documents with "
+                    "exact citations and refuses when the corpus does not cover the "
+                    "question, instead of guessing.")
+        if any(h in low for h in _AI_HINTS):
+            return ("Built a production-shaped LLM agent: typed tools that reject a "
+                    "bad call instead of running it, human approval before anything "
+                    "sensitive, and a scored eval at 100% tool accuracy.")
     return _default_credibility(niche)
 
 

@@ -51,11 +51,13 @@
 | Repo | One-line proof | Link |
 |---|---|---|
 | `agent-orchestrator-lab` | Production-shaped LLM agent: typed Pydantic tools, multi-provider router (OpenAI/Claude/Gemini/Groq), human-in-the-loop approval that defaults to deny, retries + timeout + error taxonomy, auditable trace. Scored on 4 real API tasks: **100% pass rate, 100% tool accuracy**, with a committed real run trace. | https://github.com/SandiRidwan/agent-orchestrator-lab |
+| `rag-knowledge-service` | RAG that runs with **no API key** (local BM25) and **refuses** when the corpus does not cover the question instead of guessing. Every answer cites the exact chunk. Ships a real corpus + eval: **7/7 in-corpus cited correctly, 3/3 off-corpus refused**. FastAPI + Streamlit. | https://github.com/SandiRidwan/rag-knowledge-service |
+| `n8n-ai-workflow-pack` | Three importable n8n workflows built around the safe patterns: pre-LLM validation, duplicate guard, **human-in-the-loop approval that fails closed**. Plus a reusable workflow validator (9 tests). | https://github.com/SandiRidwan/n8n-ai-workflow-pack |
 
-> Use this FIRST on any brief that says AI agent, agent orchestration, tool
-> calling, LLM workflow, RAG, prompt engineering, multi-provider, or "not just a
-> chatbot". The committed trace (plan -> typed tool calls -> approval-gated write
-> -> answer) is the proof.
+> Use these FIRST on any brief that says AI agent, agent orchestration, tool
+> calling, LLM workflow, RAG, n8n, prompt engineering, multi-provider, or "not just
+> a chatbot". The committed trace, the refusal-on-unknown behaviour, and the
+> fail-closed approval gate are the proof.
 
 ## C2. SQL, T-SQL & warehousing (advanced SQL evidence)
 

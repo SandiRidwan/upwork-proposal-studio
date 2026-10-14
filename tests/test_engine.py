@@ -533,11 +533,16 @@ class TestAiAutomationNiche(unittest.TestCase):
         self.assertIn("prototype", a.failure_mode.lower())
 
     def test_ai_brief_routes_to_agent_repo(self):
+        # no RAG/n8n keywords -> the agent orchestrator is the right proof
         a = analyze("AI Agent Development with LLM workflows, tool calling, "
-                    "and agent orchestration. OpenAI and Claude, RAG.")
+                    "and agent orchestration. OpenAI and Claude.")
         self.assertEqual(a.niche, "B")
         self.assertIn("agent-orchestrator-lab", a.portfolio_link)
         self.assertIn("LLM agent", a.credibility_fact)
+
+    def test_rag_takes_precedence_over_agent_when_named(self):
+        a = analyze("AI Agent with RAG over our documents and a vector store.")
+        self.assertIn("rag-knowledge-service", a.portfolio_link)
 
     def test_plain_pipeline_brief_keeps_pipeline_repo(self):
         a = analyze("Automate our lead flow: copy form submissions into Airtable, "
@@ -545,6 +550,17 @@ class TestAiAutomationNiche(unittest.TestCase):
         self.assertEqual(a.niche, "B")
         self.assertIn("lead-intelligence-pipeline", a.portfolio_link)
         self.assertNotIn("agent-orchestrator-lab", a.portfolio_link)
+
+    def test_n8n_brief_routes_to_workflow_pack(self):
+        a = analyze("Build advanced AI automation using n8n and connect our CRM.")
+        self.assertIn("n8n-ai-workflow-pack", a.portfolio_link)
+        self.assertIn("n8n AI workflows", a.credibility_fact)
+
+    def test_rag_brief_routes_to_knowledge_service(self):
+        a = analyze("We need a RAG system that answers from our internal "
+                    "documents using a vector database.")
+        self.assertIn("rag-knowledge-service", a.portfolio_link)
+        self.assertIn("refuses", a.credibility_fact)
 
 
 class TestPipeline(unittest.TestCase):
