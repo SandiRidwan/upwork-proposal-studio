@@ -89,6 +89,16 @@ NICHE_SIGNALS = {
         ],
         "weight": 1.0,
     },
+    "F": {  # authenticated / logged-in scraping (account-safe, not anti-bot)
+        "keywords": [
+            "logged-in", "logged in", "login", "log in", "sign in", "sign-in",
+            "my account", "member account", "credentials", "authenticated",
+            "private", "member directory", "member area", "behind a login",
+            "session", "not flagged", "flagged", "rate limit", "low request rate",
+            "pagination", "infinite scroll", "export the directory",
+        ],
+        "weight": 1.0,
+    },
 }
 
 CLIENT_TYPE_SIGNALS = {
@@ -140,6 +150,7 @@ class JobAnalysis:
     portfolio_link: str = ""
     variant: str = "short"
     niche_scores: dict = field(default_factory=dict)
+    must_open_with: str = ""          # e.g. "Directory" (application filter)
     used_llm: bool = False
 
     def to_dict(self) -> dict:
@@ -152,6 +163,7 @@ NICHE_LABEL = {
     "C": "data analysis / dashboard",
     "D": "platform / API / infrastructure",
     "E": "lead gen / market intelligence",
+    "F": "authenticated / logged-in extraction",
 }
 
 
@@ -270,6 +282,7 @@ def analyze(job_post: str, *, use_llm: bool = True) -> JobAnalysis:
     a.variant = "short" if (a.urgency == "high" or len(text) < 700) else "process"
     a.failure_mode = _heuristic_failure_mode(text, niche)
     a.named_symptom = _heuristic_symptom(text)
+    a.must_open_with = _detect_filter_word(text)
 
     if use_llm and llm.is_live():
         refined = _refine_with_llm(a, text)
@@ -279,6 +292,30 @@ def analyze(job_post: str, *, use_llm: bool = True) -> JobAnalysis:
     return a
 
 
+def _detect_filter_word(text: str) -> str:
+    """
+    Some posts use an application filter: 'start your proposal with the word X',
+    'begin with X', 'your first word must be X'. Missing it loses the job before
+    anything is read, so capture it and enforce it in the writer.
+
+    Return the word with the capitalization used right after the instruction
+    (e.g. 'Directory'), not just the first occurrence anywhere in the post.
+    """
+    import re
+    patterns = [
+        r"start your (?:proposal|application|cover letter) with the word\s+['\"]?([A-Za-z0-9]+)['\"]?",
+        r"start your (?:proposal|application|cover letter) with\s+['\"]?([A-Za-z0-9]+)['\"]?",
+        r"begin your (?:proposal|application) with (?:the word\s+)?['\"]?([A-Za-z0-9]+)['\"]?",
+        r"(?:proposal|application) (?:must|should) start with (?:the word\s+)?['\"]?([A-Za-z0-9]+)['\"]?",
+        r"first word (?:of your (?:proposal|application)\s+)?(?:must|should) be\s+['\"]?([A-Za-z0-9]+)['\"]?",
+    ]
+    for pat in patterns:
+        m = re.search(pat, text, re.I)
+        if m:
+            return m.group(1).strip()
+    return ""
+
+
 def _default_portfolio(niche: str) -> str:
     return {
         "A": "https://github.com/SandiRidwan/ct-appellate-court-scraper",
@@ -286,6 +323,7 @@ def _default_portfolio(niche: str) -> str:
         "C": "https://github.com/SandiRidwan/morrisons-market-intelligence",
         "D": "https://github.com/SandiRidwan/public-data-api",
         "E": "https://github.com/SandiRidwan/saudi-b2b-leads-validator",
+        "F": "https://github.com/SandiRidwan/ct-appellate-court-scraper",
     }[niche]
 
 
@@ -302,11 +340,20 @@ def _default_credibility(niche: str) -> str:
              "that survive a real deploy, not just localhost.",
         "E": "Measures coverage before promising volume, after finding a path "
              "that looked complete and only reached about 14% of the catalogue.",
+        "F": "Ran a 56,598-record extraction through a single session, low and "
+             "slow, with a resumable checkpoint so nothing was lost or re-pulled.",
     }[niche]
 
 
 def _heuristic_failure_mode(text: str, niche: str) -> str:
     low = text.lower()
+    # authenticated extraction first: a login job is not an anti-bot fight
+    if any(k in low for k in ["logged-in", "logged in", "member directory",
+                              "member account", "member area", "my account",
+                              "credentials", "export the directory",
+                              "behind a login", "private online community"]):
+        return ("The data sits behind a member login, and pulling it without "
+                "tripping the account or losing rows is the hard part.")
     if any(k in low for k in ["blocked", "captcha", "403", "cloudflare",
                               "akamai", "datadome", "anti-bot"]):
         return "They tried scraping and the target site blocked them."

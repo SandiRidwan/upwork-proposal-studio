@@ -352,6 +352,43 @@ class TestScreeningAndPlaceholders(unittest.TestCase):
         self.assertEqual(qs[0], "Do you scrape?")
 
 
+class TestFilterWordAndAuthNiche(unittest.TestCase):
+    def test_detect_filter_word_keeps_case(self):
+        from engine.analyzer import _detect_filter_word
+        text = ("Please start your proposal with the word 'Directory'. "
+                "Also mention your approach.")
+        self.assertEqual(_detect_filter_word(text), "Directory")
+
+    def test_detect_filter_variants(self):
+        from engine.analyzer import _detect_filter_word
+        self.assertEqual(_detect_filter_word("Begin your proposal with Apple"),
+                         "Apple")
+        self.assertEqual(
+            _detect_filter_word("Your first word must be 'Hello'."), "Hello")
+
+    def test_no_filter_word(self):
+        from engine.analyzer import _detect_filter_word
+        self.assertEqual(_detect_filter_word("Just a normal job post."), "")
+
+    def test_login_job_is_niche_f_not_antibot(self):
+        a = analyze(
+            "I'll provide login credentials for my member account. Export the "
+            "member directory from the private community. Keep request rates low "
+            "so the account isn't flagged. Use pagination and infinite scroll.")
+        self.assertEqual(a.niche, "F")
+        self.assertNotIn("blocked", a.failure_mode.lower())
+
+    def test_enforce_filter_prepends(self):
+        from engine.writer import _enforce_filter
+        self.assertTrue(_enforce_filter("The site truncates cards.",
+                                        "Directory").startswith("Directory"))
+        # already correct: unchanged
+        self.assertEqual(_enforce_filter("Directory. Body here.", "Directory"),
+                         "Directory. Body here.")
+        # empty word: unchanged
+        self.assertEqual(_enforce_filter("Body here.", ""), "Body here.")
+
+
 class TestPipeline(unittest.TestCase):
     def test_full_run(self):
         result = run(JOB_ANTIBOT, use_llm=False, review=True)

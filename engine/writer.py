@@ -136,6 +136,12 @@ Also: address the deliverable the client actually asked for, not a neighbouring 
 If they asked for research and insights, the proof is about findings and patterns,
 not about the mechanics of scraping.
 
+Also: if the post lists explicit requirements, deliverables, formatting rules, or
+handling instructions (for example "deliver CSV and XLSX", "leave blanks empty, no
+N/A", "delete credentials after the job", "send a failure summary", "state your
+start date"), address each of the MATERIAL ones in the body, briefly and plainly.
+A requirement left silent reads as one you did not notice.
+
 IMPORTANT - numbers: never put a number in the body that is not in the provided
 facts, EXCEPT a price or timeframe. When the client explicitly asks for a price,
 a rate, a volume or a timeline, you MUST give a concrete number or a narrow range
@@ -263,6 +269,7 @@ def write_one(analysis: JobAnalysis, job_post: str, *,
         text, answers = _split_screening(res.text)
         body, needs = _split_needs(text)
         body = _strip_placeholders(body)
+        body = _enforce_filter(body, getattr(analysis, "must_open_with", ""))
         v = _variant("proposal", body)
         v.lint = lint(v.body)
         bundle.variants = [v]
@@ -334,6 +341,22 @@ def _split_needs(text: str) -> tuple[str, list[str]]:
             seen.add(n.lower())
             out.append(n)
     return body, out
+
+
+def _enforce_filter(body: str, word: str) -> str:
+    """
+    Guarantee an application filter word starts the body.
+
+    Some posts require the proposal to begin with a specific word; if the model
+    missed it, prepend it here so the filter can never silently fail.
+    """
+    if not word:
+        return body
+    stripped = body.lstrip()
+    first = re.split(r"[\s.,;:!?]", stripped, maxsplit=1)[0] if stripped else ""
+    if first.lower() == word.lower():
+        return body
+    return f"{word}. {stripped}"
 
 
 def _strip_placeholders(text: str) -> str:
@@ -410,6 +433,15 @@ def _one_prompt(analysis: JobAnalysis, job_post: str,
         numbered = "\n".join(f"{i}. {q}" for i, q in enumerate(screening_questions, 1))
         screening_block = SCREENING_TASK.format(questions=numbered)
 
+    filter_block = ""
+    if getattr(a, "must_open_with", ""):
+        filter_block = (
+            f"\nAPPLICATION FILTER (MANDATORY): the client requires the proposal to "
+            f'BEGIN with the exact word "{a.must_open_with}". The very first token of '
+            f"the body must be {a.must_open_with}, followed by a period or comma, then "
+            f"the normal opening. Missing this loses the job before it is read.\n"
+        )
+
     return f"""{_skill_body()}
 
 --- IDENTITY: POSITIONING (facts you may claim) ---
@@ -426,7 +458,7 @@ def _one_prompt(analysis: JobAnalysis, job_post: str,
 
 --- ANALYSIS OF THIS JOB ---
 {facts}
-
+{filter_block}
 --- JOB POST ---
 {job_post[:5000]}
 
