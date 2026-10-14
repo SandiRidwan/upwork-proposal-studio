@@ -114,14 +114,39 @@ version of both skills combined:
 
 Structure (prose, no headings, no labels):
 1. Open on the client's failure mode, in their words. No greeting. Never credentials.
-   The FIRST TWO LINES must contain the client's own key nouns (their industry, their
-   target, their data type - for example "Australian real estate directories"). Upwork
-   ranks proposals by match, and a busy client only sees the first two lines.
+   The FIRST TWO LINES must contain (a) the client's own key nouns AND (b) the stack
+   or domain the post names (for example "SQL and T-SQL", "Australian real estate
+   directories"). Upwork ranks proposals by that match, and a busy client only sees
+   the first two lines. Then, within the first two lines, add ONE short match signal
+   that you have done this kind of work ("I've run this shape of report on a 60k-row
+   warehouse"). A hook that is pure diagnosis with no stack and no match reads as an
+   essay and the scroller skips it.
 2. One precise technical detail only an insider would say.
 3. Exactly one credibility line, mid-proposal. Never the opener. If a portfolio link
    is provided, include it as a real, clickable URL (never described, never dropped).
 4. Kill the hiring risk: a free sample, mini-audit, or one concrete first step.
 5. Close with a scoped, easy-to-answer question. Never "looking forward to hearing".
+
+Answer the client's EXPLICIT requirements. If the post names a number of years, a
+tool, a deliverable, or a responsibility ("automate recurring reports", "5+ years"),
+address each material one in the body in a sentence. A stated requirement left
+silent reads as one you do not meet. Do NOT ask a question the post already
+answers (if it requires T-SQL, it is on SQL Server - do not ask "which database").
+
+EXPERIENCE HONESTY: if the post asks for N years and the facts given do not state
+that many, do NOT dodge ("it's hands-on throughout") and do NOT invent a number.
+State the REAL figure from POSITIONING (currently three years) in one line and
+immediately anchor it with depth and volume of shipped work. Honesty plus evidence
+beats a vague hedge, and it beats a lie the client can check. Never claim 5+ years.
+
+RATE & AVAILABILITY: the POSITIONING file has a rate card with real numbers
+(hourly rate, per-1,000 price, weekly hours, start time). When the client asks for
+a rate, a budget, a timeline, or availability, USE THOSE NUMBERS. Do not leave a
+price blank and do not ask the client for their budget instead of quoting.
+
+TOOL NAMES: use the correct term for the stack. On PostgreSQL it is EXPLAIN
+(ANALYZE); on SQL Server / T-SQL it is the execution plan (SHOWPLAN / Actual
+Execution Plan), not EXPLAIN. Naming the wrong tool reads as inexperience.
 
 CRITICAL - placeholders never go in the proposal body:
 - The proposal body must be READY TO SEND. It must contain no square-bracket text,
@@ -153,6 +178,11 @@ refusal in the body.
 
 Pricing shape: "Roughly $X per 1,000 valid contacts, assuming emails are on the
 listing; closer to $Y if enrichment is needed. Initial 25,000 batch in N days."
+
+VOICE: "you"/"your" must outnumber "I"/"my"/"me". If the draft leans on "I", rewrite
+those sentences to lead with the client's team or result. Contractions throughout.
+
+If the client asks for availability, a start date, or a rate, give one line for it.
 
 Use ONLY the credibility facts and portfolio links provided. Never invent a client,
 result, metric, or technology."""
@@ -578,6 +608,8 @@ _FREEZE = {
     "C": "That is almost always a join-key problem before it's a chart problem.",
     "D": "That usually isn't the feature, it's what happens under load.",
     "E": "That is almost always a coverage problem before it's a volume problem.",
+    "F": "That is rarely the fetch, it's keeping the session and the row count honest.",
+    "G": "That is usually the query shape, not the server.",
 }
 
 # A niche-aware closing question (five move 5).
@@ -587,6 +619,8 @@ _CLOSING = {
     "C": "What are the two sources, and roughly how many records are we joining?",
     "D": "What's the endpoint, and how many calls a day do you expect?",
     "E": "What's the source, and roughly how many records are we talking about?",
+    "F": "What's the source site, and which fields do you actually need?",
+    "G": "Which query or report is slowest today, and do you have an execution plan for it?",
 }
 
 
@@ -607,6 +641,12 @@ _TECH_DETAIL = {
     "E": ("One collection path that looked complete only reached about 14% of "
           "the catalogue, and the listings rotated. Coverage gets measured "
           "before volume is promised."),
+    "F": ("One logged-in session, a few seconds between pages, a checkpoint after "
+          "every row and resume on a drop beats hammering the account."),
+    "G": ("A report that 'feels slow' is usually one query shape: a function on "
+          "the indexed column, a correlated subquery per row, or a missing "
+          "covering index. The plan tells you which, so you measure before you "
+          "reshape anything."),
 }
 
 

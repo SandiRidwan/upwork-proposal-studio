@@ -46,6 +46,20 @@
 | `indonesia-economy-intelligence` | 60+ years, 17 indicators, cross-era analysis + forecasting + Streamlit | https://github.com/SandiRidwan/indonesia-economy-intelligence |
 | `document-intelligence-lab` | PDF extraction + accuracy validation (honest about limits) | https://github.com/SandiRidwan/document-intelligence-lab |
 
+## C2. SQL, T-SQL & warehousing (advanced SQL evidence)
+
+| Repo | One-line proof | Link |
+|---|---|---|
+| `sql-analytics-lab` | Advanced SQL (CTEs, `LAG`/`RANK`/`ROW_NUMBER`) run on PostgreSQL + DuckDB + SQL Server; measured tuning on PostgreSQL row-store: pre-aggregation **472x**, correlated-subquery→join **56x**, with `EXPLAIN ANALYZE` before/after | https://github.com/SandiRidwan/sql-analytics-lab |
+| `tsql-performance-lab` | 10 T-SQL tuning cases on real SQL Server data; covering index **132x**, implicit-conversion fix **17.9x**, prefix-vs-wildcard LIKE **658x**; equality test proves the tuned query returns the same rows | https://github.com/SandiRidwan/tsql-performance-lab |
+| `data-quality-operations` | 13 SQL DQ checks on real data → PASS/WARN/FAIL + root cause + run history; distinguishes "source limitation" from "real break" | https://github.com/SandiRidwan/data-quality-operations |
+| `analytics-warehouse` | Star schema + **TYPE-2 SCD** on real BPS data (344 dim rows / 270 regencies); surrogate keys, conformed dims, 10 model-integrity tests | https://github.com/SandiRidwan/analytics-warehouse |
+
+> Use these when a brief names **advanced SQL, T-SQL, window functions, query
+> performance, data modelling, or data quality**. Lead with `sql-analytics-lab` or
+> `tsql-performance-lab` for query work; `analytics-warehouse` for modelling;
+> `data-quality-operations` for monitoring/root-cause.
+
 ## D. Lead gen & market intelligence
 
 | Repo | One-line proof | Link |

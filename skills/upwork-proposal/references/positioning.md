@@ -6,6 +6,44 @@ Every proposal on a job worth winning should carry **one** line establishing tha
 
 Place it **after the hook and before the offer**, never as the opening sentence. Opening with your own credentials tells the client you are thinking about yourself. Opening with their problem tells them you are thinking about them, and then the credential lands as reassurance rather than as a sales pitch.
 
+## Experience: how to answer "N+ years" honestly
+
+**Real figure: 3 years.** State it plainly when a post asks for more. Two rules:
+
+1. **Never invent a number.** If the post asks for 5 and the real number is 3, say 3,
+   and do not dodge with "it's hands-on throughout" (that reads as hiding something).
+2. **State the real position, then anchor it with depth and volume in the same
+   breath.** Approved shape:
+   > "Three years, but production pipelines ship from here weekly and this exact
+   > stack is what runs daily. The depth is in what's shipped, not the calendar."
+
+The anchor must be true: repos, records processed, tests, uptime. A shorter honest
+tenure with strong evidence beats a vague hedge, and it beats a number the client
+can check against the profile.
+
+**Never** claim 5+ years. Do not put a fabricated year count anywhere. The panel
+flags it and clients verify.
+
+## Rate card (set to real numbers)
+
+| Service shape | Rate | Notes |
+|---|---|---|
+| Standard technical work | **$30 /hr** | scraping, pipelines, SQL, analysis, DQ |
+| Short task / one-off fix | **$30 /hr** (min 2 hrs) | small, urgent, single deliverable |
+| Scraper / extraction build | **$30 /hr**, or fixed by scope | quote after a coverage measurement |
+| Pipeline / automation | **$30 /hr** | includes monitoring + alerting |
+| Data analysis / dashboard | **$30 /hr** | includes a written summary |
+| SQL / warehouse / DQ work | **$30 /hr** | tuning or modelling |
+| Volume data (per 1,000 records) | **$60** per 1,000 valid rows | state the "valid" definition; $95 if enrichment needed |
+| Availability | **25 hrs/week**, start within **2 days** | fixed-hour or milestone both fine |
+
+Guidance: anchor at $30/hr; go up to $40 for senior/urgent scope, down to $25 only
+for a small first job with a long-term signal. Never quote below $20 — it reads as
+junior and attracts the wrong clients. On a fixed bid, estimate hours at $30/hr and
+round up, not down.
+
+If a client asks for a rate the card does not cover, use the closest row and scale.
+
 ## The verified facts to draw from
 
 Use only what is true and only what is relevant to the brief in front of you. Every number here is checkable against a public repo.
@@ -32,6 +70,18 @@ Use only what is true and only what is relevant to the brief in front of you. Ev
 - **An A/B testing lab.** Power, CI, FDR, SRM checks, CUPED. Use on "our experiments keep giving us noise".
 - **Reproducible data platforms.** World Bank, BPS, GADM to DuckDB to SQL marts to Streamlit, honest about data limits. Use on "we need a platform, not a one-off notebook".
 - **Every chart states the decision, not just the number.** Use when the client says the last dashboard told them nothing.
+
+### C2. "Advanced SQL / T-SQL / data modelling" / warehouse roles
+
+- **Advanced SQL, measured not just written.** CTEs, `LAG`/`RANK`/`ROW_NUMBER`, window frames, gaps-and-islands, conditional-aggregate pivots, anti-joins — run on **PostgreSQL 18, SQL Server 2017 and DuckDB**. Use on any "advanced SQL" brief.
+- **Query performance with the numbers attached.** On a real PostgreSQL row-store: pre-aggregation **472x**, correlated-subquery→join **56x** (8.8s→0.16s). On real SQL Server data: covering index **132x**, implicit-conversion fix **17.9x**, prefix-vs-wildcard `LIKE` **658x** — each with `EXPLAIN ANALYZE`/`SHOWPLAN` before and after. Use when the brief says "query performance improvement".
+- **T-SQL for real.** 10 tuning cases executed on Microsoft SQL Server, not written on paper. Use when the brief names T-SQL or the Microsoft stack.
+- **A dimensional model that survives change.** Star schema with a **TYPE-2 slowly-changing dimension**: 344 dimension versions for 270 regencies, so "what was this attribute in 2021?" still answers correctly. Use on data-modelling / warehouse briefs.
+- **Data quality as a system.** 13 SQL checks → PASS/WARN/FAIL with a plain-English root cause per check, and it distinguishes a source limitation from a real break. Use on "monitor data quality" briefs.
+
+### C3. The combination (the real differentiator)
+
+Most analysts can either **get the data** or **analyse it**. Very few do both end to end. State it plainly when the brief is small-team or data-heavy: extraction at scale + automation + SQL + analysis in one person. Use on "one person who can own the data" briefs rather than pure reporting roles.
 
 ### D. "Deploy it and keep it running" / platform
 

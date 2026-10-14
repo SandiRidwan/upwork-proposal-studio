@@ -389,6 +389,47 @@ class TestFilterWordAndAuthNiche(unittest.TestCase):
         self.assertEqual(_enforce_filter("Body here.", ""), "Body here.")
 
 
+class TestSqlNiche(unittest.TestCase):
+    def test_sql_job_maps_to_niche_g(self):
+        a = analyze(
+            "Advanced SQL and T-SQL required. Complex joins, CTEs, window "
+            "functions, query performance improvement. Large relational "
+            "databases and complex data models. SQL Server.")
+        self.assertEqual(a.niche, "G")
+        self.assertIn("sql-analytics-lab", a.portfolio_link)
+
+    def test_niche_g_failure_mode_and_credibility(self):
+        a = analyze("We need help improving query performance and data "
+                    "quality on our warehouse.")
+        self.assertEqual(a.niche, "G")
+        self.assertIn("slow", a.failure_mode.lower())
+        self.assertIn("8.8s", a.credibility_fact)
+
+    def test_sql_beats_dashboard_niche(self):
+        # a brief that names SQL/T-SQL/tuning must not fall into niche C
+        a = analyze("T-SQL query tuning, execution plans, CTEs, window "
+                    "functions, SQL Server, data quality checks.")
+        self.assertEqual(a.niche, "G")
+
+
+class TestRateCard(unittest.TestCase):
+    def test_positioning_has_real_rate_not_placeholder(self):
+        pos = knowledge.positioning()
+        self.assertIn("$30", pos)
+        self.assertIn("25 hrs/week", pos)
+        self.assertIn("3 years", pos)
+        # the rate card must not still be an [ADD] placeholder
+        rate_rows = [l for l in pos.splitlines()
+                     if l.strip().startswith("|") and "$" in l or "hrs/week" in l]
+        for row in rate_rows:
+            self.assertNotIn("[ADD", row)
+
+    def test_no_fake_five_year_claim(self):
+        pos = knowledge.positioning()
+        self.assertNotIn("5+ years of experience", pos)
+        self.assertIn("Never", pos)
+
+
 class TestPipeline(unittest.TestCase):
     def test_full_run(self):
         result = run(JOB_ANTIBOT, use_llm=False, review=True)

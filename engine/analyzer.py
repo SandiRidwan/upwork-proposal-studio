@@ -99,6 +99,20 @@ NICHE_SIGNALS = {
         ],
         "weight": 1.0,
     },
+    "G": {  # SQL / data engineering / warehouse / data quality
+        "keywords": [
+            "sql", "t-sql", "tsql", "query", "queries", "cte", "window function",
+            "window functions", "stored procedure", "join", "index", "query tuning",
+            "query performance", "query optimisation", "query optimization",
+            "execution plan", "explain", "etl", "elt", "warehouse", "data warehouse",
+            "dimensional", "star schema", "snowflake schema", "slowly changing",
+            "scd", "data model", "data modelling", "data modeling", "dimension",
+            "fact table", "data quality", "data validation", "sql server",
+            "postgres", "postgresql", "duckdb", "bigquery", "snowflake",
+            "redshift", "database", "relational",
+        ],
+        "weight": 1.0,
+    },
 }
 
 CLIENT_TYPE_SIGNALS = {
@@ -164,6 +178,7 @@ NICHE_LABEL = {
     "D": "platform / API / infrastructure",
     "E": "lead gen / market intelligence",
     "F": "authenticated / logged-in extraction",
+    "G": "SQL / data engineering / warehousing",
 }
 
 
@@ -324,6 +339,7 @@ def _default_portfolio(niche: str) -> str:
         "D": "https://github.com/SandiRidwan/public-data-api",
         "E": "https://github.com/SandiRidwan/saudi-b2b-leads-validator",
         "F": "https://github.com/SandiRidwan/ct-appellate-court-scraper",
+        "G": "https://github.com/SandiRidwan/sql-analytics-lab",
     }[niche]
 
 
@@ -342,6 +358,9 @@ def _default_credibility(niche: str) -> str:
              "that looked complete and only reached about 14% of the catalogue.",
         "F": "Ran a 56,598-record extraction through a single session, low and "
              "slow, with a resumable checkpoint so nothing was lost or re-pulled.",
+        "G": "Cut a report from 8.8s to 0.16s by rewriting a correlated subquery "
+             "into one grouped join on PostgreSQL, and measured it with EXPLAIN "
+             "before and after.",
     }[niche]
 
 
@@ -384,6 +403,9 @@ def _heuristic_failure_mode(text: str, niche: str) -> str:
         return "Something that should run itself still needs a human."
     if niche == "E":
         return "Their current lead or market data is stale or incomplete."
+    if niche == "G":
+        return ("Their queries or reports are slow or inconsistent, and nobody "
+                "has measured which part is actually the problem.")
     if niche == "C":
         return "They have data but no clear decision coming out of it."
     if niche == "B":
