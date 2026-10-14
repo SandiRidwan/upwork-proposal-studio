@@ -299,8 +299,8 @@ def analyze(job_post: str, *, use_llm: bool = True) -> JobAnalysis:
         budget_signal=_budget_signal(text),
         red_flags=_detect_red_flags(text),
         green_flags=_detect_green_flags(text),
-        portfolio_link=_default_portfolio(niche),
-        credibility_fact=_default_credibility(niche),
+        portfolio_link=_portfolio_for(niche, text),
+        credibility_fact=_credibility_for(niche, text),
     )
 
     a.variant = "short" if (a.urgency == "high" or len(text) < 700) else "process"
@@ -351,6 +351,34 @@ def _default_portfolio(niche: str) -> str:
         "F": "https://github.com/SandiRidwan/ct-appellate-court-scraper",
         "G": "https://github.com/SandiRidwan/sql-analytics-lab",
     }[niche]
+
+
+_AI_HINTS = ("ai agent", "agent", "llm", "rag", "langchain", "langgraph",
+             "mcp", "openai", "anthropic", "claude", "gemini", "prompt",
+             "tool calling", "orchestration", "chatbot")
+
+
+def _portfolio_for(niche: str, text: str) -> str:
+    """
+    Pick the portfolio link, considering context within a niche.
+
+    Niche B covers both pipeline work and AI-agent work; for an AI brief the
+    agent repo is the right proof, not the enrichment pipeline.
+    """
+    low = text.lower()
+    if niche == "B" and any(h in low for h in _AI_HINTS):
+        return "https://github.com/SandiRidwan/agent-orchestrator-lab"
+    return _default_portfolio(niche)
+
+
+def _credibility_for(niche: str, text: str) -> str:
+    """Niche credibility, with an AI-specific line when the brief is about agents."""
+    low = text.lower()
+    if niche == "B" and any(h in low for h in _AI_HINTS):
+        return ("Built a production-shaped LLM agent: typed tools that reject a bad "
+                "call instead of running it, human approval before anything "
+                "sensitive, and a scored eval at 100% tool accuracy.")
+    return _default_credibility(niche)
 
 
 def _default_credibility(niche: str) -> str:

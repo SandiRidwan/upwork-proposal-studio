@@ -46,6 +46,17 @@
 | `indonesia-economy-intelligence` | 60+ years, 17 indicators, cross-era analysis + forecasting + Streamlit | https://github.com/SandiRidwan/indonesia-economy-intelligence |
 | `document-intelligence-lab` | PDF extraction + accuracy validation (honest about limits) | https://github.com/SandiRidwan/document-intelligence-lab |
 
+## C1. AI agents / LLM orchestration (AI automation evidence)
+
+| Repo | One-line proof | Link |
+|---|---|---|
+| `agent-orchestrator-lab` | Production-shaped LLM agent: typed Pydantic tools, multi-provider router (OpenAI/Claude/Gemini/Groq), human-in-the-loop approval that defaults to deny, retries + timeout + error taxonomy, auditable trace. Scored on 4 real API tasks: **100% pass rate, 100% tool accuracy**, with a committed real run trace. | https://github.com/SandiRidwan/agent-orchestrator-lab |
+
+> Use this FIRST on any brief that says AI agent, agent orchestration, tool
+> calling, LLM workflow, RAG, prompt engineering, multi-provider, or "not just a
+> chatbot". The committed trace (plan -> typed tool calls -> approval-gated write
+> -> answer) is the proof.
+
 ## C2. SQL, T-SQL & warehousing (advanced SQL evidence)
 
 | Repo | One-line proof | Link |

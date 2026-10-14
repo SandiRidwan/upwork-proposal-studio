@@ -59,6 +59,7 @@ Use only what is true and only what is relevant to the brief in front of you. Ev
 ### B. "I need a pipeline, not just a scraper" / automation / enrichment
 
 - **7 scrapers to Groq scoring to PostgreSQL to 3-tier routing to a daily email digest.** 302 tests passing, 0 errors, 24/7. Use when the client says the word "reliable", "ongoing", or "we don't want to babysit it".
+- **A production-shaped LLM agent, not a chatbot.** Typed Pydantic tools (a bad tool call is rejected, never executed), a router across OpenAI/Claude/Gemini, human-in-the-loop approval for sensitive actions, retries with backoff, and an auditable trace. Scored on real API tasks: **100% pass rate, 100% tool accuracy**. Use on any "AI agent / agent orchestration / tool calling / not just a prototype" brief.
 - **A lead intelligence pipeline that enriches and routes 16 leads in 22 seconds.** CSV to LLM enrichment (industry, ICP score, intent) to geo routing to Slack. Use on lead-gen and enrichment briefs.
 - **A 0DTE options scanner, 50 tickers, 24/7 with alerts.** Use when the client wants a job that runs itself and tells them when something matters.
 - **Sheets, Make.com, n8n, Calendly to Monday.com.** Duplicate guards, timezone conversion, error alerts. Use on "someone copies this by hand every day" briefs.

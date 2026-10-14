@@ -532,6 +532,20 @@ class TestAiAutomationNiche(unittest.TestCase):
                     "that never made it past demo.")
         self.assertIn("prototype", a.failure_mode.lower())
 
+    def test_ai_brief_routes_to_agent_repo(self):
+        a = analyze("AI Agent Development with LLM workflows, tool calling, "
+                    "and agent orchestration. OpenAI and Claude, RAG.")
+        self.assertEqual(a.niche, "B")
+        self.assertIn("agent-orchestrator-lab", a.portfolio_link)
+        self.assertIn("LLM agent", a.credibility_fact)
+
+    def test_plain_pipeline_brief_keeps_pipeline_repo(self):
+        a = analyze("Automate our lead flow: copy form submissions into Airtable, "
+                    "enrich company info, route to Slack.")
+        self.assertEqual(a.niche, "B")
+        self.assertIn("lead-intelligence-pipeline", a.portfolio_link)
+        self.assertNotIn("agent-orchestrator-lab", a.portfolio_link)
+
 
 class TestPipeline(unittest.TestCase):
     def test_full_run(self):
