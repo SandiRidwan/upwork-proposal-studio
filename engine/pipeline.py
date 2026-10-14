@@ -66,8 +66,13 @@ def run(
     if bid:
         combined += f"\n\n[BID / RATE]\n{bid}"
 
+    # split the screening block into individual questions so they can be answered
+    # one by one (each has its own input box on Upwork)
+    screening_qs = _parse_questions(screening) if screening else []
+
     analysis = analyze(combined, use_llm=use_llm)
-    proposal = write_one(analysis, combined, include_screening=True)
+    proposal = write_one(analysis, combined, include_screening=True,
+                         screening_questions=screening_qs or None)
 
     panel = None
     if review:
@@ -80,11 +85,37 @@ def run(
         "analyzer_used_llm": analysis.used_llm,
         "writer_used_llm": proposal.used_llm,
         "panel_used_llm": bool(panel and panel.used_llm),
+        "panel_panel_error": (panel.llm_error if panel else ""),
         "panel_reviewers": 7 if panel else 0,
+        "screening_questions": len(proposal.screening_answers),
     }
 
     return RunResult(analysis=analysis, proposal=proposal, panel=panel,
                      meta=meta)
+
+
+def _parse_questions(text: str) -> list:
+    """Split a pasted screening block into individual questions."""
+    import re
+    qs = []
+    for line in (text or "").splitlines():
+        line = line.strip()
+        if not line:
+            continue
+        # strip leading numbering / bullets
+        line = re.sub(r"^[\-\*\d\.\)\s]+", "", line).strip()
+        if line.endswith("?"):
+            qs.append(line)
+        elif len(line) > 12:  # a question without a question mark
+            qs.append(line)
+    # de-dup, keep order
+    seen = set()
+    out = []
+    for q in qs:
+        if q.lower() not in seen:
+            seen.add(q.lower())
+            out.append(q)
+    return out
 
 
 def _run_panel(proposal: ProposalBundle, job_post: str, analysis,

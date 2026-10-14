@@ -22,6 +22,7 @@ from .writer import lint
 
 def _weights(issue: dict) -> int:
     return {
+        "placeholder_left_in": 25,   # a to-do note in a sent proposal is fatal
         "banned_phrase": 18,
         "exclamation": 12,
         "emoji": 12,

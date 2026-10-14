@@ -56,6 +56,7 @@ class Variant:
 class ProposalBundle:
     variants: list = field(default_factory=list)
     screening_answers: list = field(default_factory=list)
+    needs: list = field(default_factory=list)   # facts to fill before sending
     used_llm: bool = False
     prompt: str = ""
     notes: str = ""
@@ -69,6 +70,7 @@ class ProposalBundle:
         return {
             "variants": [v.to_dict() for v in self.variants],
             "screening_answers": self.screening_answers,
+            "needs": self.needs,
             "used_llm": self.used_llm,
             "notes": self.notes,
         }
@@ -112,14 +114,61 @@ version of both skills combined:
 
 Structure (prose, no headings, no labels):
 1. Open on the client's failure mode, in their words. No greeting. Never credentials.
+   The FIRST TWO LINES must contain the client's own key nouns (their industry, their
+   target, their data type - for example "Australian real estate directories"). Upwork
+   ranks proposals by match, and a busy client only sees the first two lines.
 2. One precise technical detail only an insider would say.
-3. Exactly one credibility line, mid-proposal. Never the opener.
+3. Exactly one credibility line, mid-proposal. Never the opener. If a portfolio link
+   is provided, include it as a real, clickable URL (never described, never dropped).
 4. Kill the hiring risk: a free sample, mini-audit, or one concrete first step.
 5. Close with a scoped, easy-to-answer question. Never "looking forward to hearing".
 
+CRITICAL - placeholders never go in the proposal body:
+- The proposal body must be READY TO SEND. It must contain no square-bracket text,
+  no [ADD], no to-do notes, no commentary.
+- If a fact you want is marked [ADD: ...] or is missing, DO NOT put it in the body.
+  Write the sentence without it, or leave it out entirely.
+- Collect every missing fact into a separate block AFTER the proposal, under the
+  exact heading: NEED FROM YOU:  (one per line, each a short question). If nothing is
+  missing, omit the block.
+
+Also: address the deliverable the client actually asked for, not a neighbouring task.
+If they asked for research and insights, the proof is about findings and patterns,
+not about the mechanics of scraping.
+
+IMPORTANT - numbers: never put a number in the body that is not in the provided
+facts, EXCEPT a price or timeframe. When the client explicitly asks for a price,
+a rate, a volume or a timeline, you MUST give a concrete number or a narrow range
+anchored to a stated assumption. Refusing to quote ("any number would be a guess")
+loses the job. The only exception is when the client gave no signal at all about
+scope or budget, in which case give a range and name the one variable that moves it.
+Anything you genuinely cannot estimate goes in the NEED FROM YOU block, not as a
+refusal in the body.
+
+Pricing shape: "Roughly $X per 1,000 valid contacts, assuming emails are on the
+listing; closer to $Y if enrichment is needed. Initial 25,000 batch in N days."
+
 Use ONLY the credibility facts and portfolio links provided. Never invent a client,
-result, metric, or technology. If a needed fact is missing, write [ADD: ...] and ask.
-Return ONLY the proposal text, nothing else."""
+result, metric, or technology."""
+
+
+# Appended to the user turn when the job post has screening questions, so they are
+# answered in the SAME call as the proposal (saves a request on rate-limited tiers
+# and keeps the answers consistent with the proposal).
+SCREENING_TASK = """
+
+--- SCREENING QUESTIONS (answer EVERY one) ---
+{questions}
+
+After the proposal (and any NEED FROM YOU block), add one final block under the
+exact heading: SCREENING ANSWERS:
+For each question above, output two lines:
+Q: <the question, verbatim>
+A: <the answer, 2 to 5 sentences, plain text, ready to paste into its own box>
+Answer every question, in order, even if it means saying what you would do. Never
+write "see cover letter". Never use a square-bracket placeholder; if a real number
+is required and unknown, answer honestly with what you do know and one concrete next
+step."""
 
 
 def _skill_body() -> str:
@@ -191,24 +240,34 @@ def build_prompt(analysis: JobAnalysis, job_post: str,
 # ---------------------------------------------------------------- live write
 
 def write_one(analysis: JobAnalysis, job_post: str, *,
-              include_screening: bool = True) -> ProposalBundle:
+              include_screening: bool = True,
+              screening_questions: list | None = None) -> ProposalBundle:
     """
     Write ONE complete proposal, then it is ready for the 7-agent panel.
 
     This is the combined flow: a single, best-effort proposal (both parents'
     strengths merged) rather than two parallel drafts. The panel judges this one.
+
+    If screening_questions are given, they are answered in the SAME LLM call so
+    the answers stay consistent with the proposal and the run costs one request
+    fewer (important on rate-limited free tiers).
     """
-    user = _one_prompt(analysis, job_post)
+    questions = list(screening_questions or [])
+    user = _one_prompt(analysis, job_post, questions or None)
     res = llm.ask(ONE_SYSTEM, user, temperature=0.75, max_tokens=4000)
 
     bundle = ProposalBundle(prompt=user)
 
     if res.ok and res.text.strip():
         bundle.used_llm = True
-        body = _strip_labels(res.text)
+        text, answers = _split_screening(res.text)
+        body, needs = _split_needs(text)
+        body = _strip_placeholders(body)
         v = _variant("proposal", body)
         v.lint = lint(v.body)
         bundle.variants = [v]
+        bundle.needs = needs
+        bundle.screening_answers = answers
     else:
         bundle.notes = (
             "No live LLM. Below is a ready-to-paste prompt for opencode plus "
@@ -219,14 +278,116 @@ def write_one(analysis: JobAnalysis, job_post: str, *,
         v.lint = lint(v.body)
         bundle.variants = [v]
 
-    if include_screening:
+    # Screening: if the model answered them inline, done. Otherwise (and only
+    # if we have questions) fall back to a separate call, then placeholders.
+    if include_screening and questions and not bundle.screening_answers:
         bundle.screening_answers = _screening_answers(
-            analysis, job_post, res.ok)
+            analysis, job_post, res.ok, questions)
+    elif include_screening and not questions:
+        # discover questions from the post text and answer them
+        guessed = _guess_questions(job_post)
+        if guessed:
+            bundle.screening_answers = _screening_answers(
+                analysis, job_post, res.ok, guessed)
 
     return bundle
 
 
-def _one_prompt(analysis: JobAnalysis, job_post: str) -> str:
+_NEEDS_MARKERS = ("NEED FROM YOU:", "NEED FROM YOU :", "NEEDS FROM YOU:",
+                  "QUESTIONS:", "TO CONFIRM:", "[ADD")
+
+
+def _split_needs(text: str) -> tuple[str, list[str]]:
+    """
+    Separate the ready-to-send proposal from the 'NEED FROM YOU' block.
+
+    The proposal body must never carry [ADD] notes; they belong in a separate
+    list the user fills before sending.
+    """
+    upper = text.upper()
+    cut = len(text)
+    for marker in _NEEDS_MARKERS:
+        idx = upper.find(marker)
+        if idx != -1:
+            cut = min(cut, idx)
+    body = text[:cut].strip()
+    tail = text[cut:].strip()
+
+    needs: list[str] = []
+    if tail:
+        for raw in tail.splitlines():
+            line = raw.strip().lstrip("-*0123456789. ").strip()
+            if not line:
+                continue
+            if line.upper().startswith(("NEED FROM YOU", "NEEDS FROM YOU",
+                                        "QUESTIONS:", "TO CONFIRM:")):
+                rest = line.split(":", 1)[-1].strip()
+                if rest:
+                    needs.append(rest)
+                continue
+            needs.append(line)
+    # de-dup, keep order
+    seen = set()
+    out = []
+    for n in needs:
+        if n.lower() not in seen:
+            seen.add(n.lower())
+            out.append(n)
+    return body, out
+
+
+def _strip_placeholders(text: str) -> str:
+    """
+    Remove any stray square-bracket placeholder or need-note that slipped into
+    the body. Blanket safety: the body must be paste-ready.
+    """
+    # drop whole lines that are only a bracket note
+    lines = []
+    for line in text.splitlines():
+        stripped = line.strip()
+        if stripped.startswith("[") and stripped.endswith("]"):
+            continue
+        lines.append(line)
+    text = "\n".join(lines)
+    # remove inline [ADD: ...] / [ ... ] fragments and tidy the gap
+    text = re.sub(r"\[[^\]]*\]", "", text)
+    text = re.sub(r"[ \t]{2,}", " ", text)
+    text = re.sub(r"\n{3,}", "\n\n", text)
+    return text.strip()
+
+
+def _split_screening(text: str) -> tuple[str, list]:
+    """
+    Pull the 'SCREENING ANSWERS:' block out of the model output.
+
+    Returns (text_without_block, [{"question":..., "answer":...}, ...]).
+    """
+    upper = text.upper()
+    idx = upper.find("SCREENING ANSWERS:")
+    if idx == -1:
+        return text, []
+    head = text[:idx].rstrip()
+    tail = text[idx + len("SCREENING ANSWERS:"):]
+
+    pairs = []
+    cur_q = None
+    for raw in tail.splitlines():
+        line = raw.strip()
+        if not line:
+            continue
+        if line.upper().startswith("Q:"):
+            cur_q = line[2:].strip()
+        elif line.upper().startswith("A:") and cur_q is not None:
+            pairs.append({"question": cur_q, "answer": line[2:].strip()})
+            cur_q = None
+        elif cur_q is not None:
+            # continuation of the question
+            cur_q += " " + line
+    return head, pairs
+
+
+def _one_prompt(analysis: JobAnalysis, job_post: str,
+                screening_questions: list | None = None) -> str:
     pos = knowledge.positioning()
     port = knowledge.portfolio()
     voice = knowledge.voice()
@@ -244,6 +405,11 @@ def _one_prompt(analysis: JobAnalysis, job_post: str) -> str:
         f"PORTFOLIO LINK (at most one): {a.portfolio_link}\n"
         f"ONE TRUE OBSERVATION: {a.one_true_observation}\n"
     )
+    screening_block = ""
+    if screening_questions:
+        numbered = "\n".join(f"{i}. {q}" for i, q in enumerate(screening_questions, 1))
+        screening_block = SCREENING_TASK.format(questions=numbered)
+
     return f"""{_skill_body()}
 
 --- IDENTITY: POSITIONING (facts you may claim) ---
@@ -266,6 +432,7 @@ def _one_prompt(analysis: JobAnalysis, job_post: str) -> str:
 
 --- TASK ---
 Write the ONE proposal now. Prose only, 180-280 words, no headings, no labels.
+{screening_block}
 """
 
 
@@ -418,6 +585,11 @@ def lint(body: str) -> list:
     issues = []
     low = body.lower()
 
+    # the body must be paste-ready: no placeholders, no to-do notes
+    if re.search(r"\[[^\]]*\]", body):
+        issues.append({"rule": "placeholder_left_in",
+                       "detail": "square-bracket note in the body"})
+
     for phrase in BANNED_PHRASES:
         if phrase in low:
             issues.append({"rule": "banned_phrase", "detail": phrase})
@@ -466,9 +638,10 @@ an empty list. Return ONLY JSON: a list of objects with keys "question" and "ans
 Never invent facts; if a fact is missing, write [ADD: ...]."""
 
 
-def _screening_answers(a: JobAnalysis, job_post: str, live: bool) -> list:
-    # heuristic: pull likely screening questions
-    questions = _guess_questions(job_post)
+def _screening_answers(a: JobAnalysis, job_post: str, live: bool,
+                       questions: list | None = None) -> list:
+    if questions is None:
+        questions = _guess_questions(job_post)
     if not questions:
         return []
 
@@ -477,7 +650,7 @@ def _screening_answers(a: JobAnalysis, job_post: str, live: bool) -> list:
                 f"Questions to answer:\n" +
                 "\n".join(f"- {q}" for q in questions) +
                 f"\n\nContext: niche={a.niche}, portfolio={a.portfolio_link}")
-        res = llm.ask(_SCREEN_SYSTEM, user, temperature=0.5, max_tokens=1500)
+        res = llm.ask(_SCREEN_SYSTEM, user, temperature=0.5, max_tokens=2000)
         if res.ok:
             from .analyzer import _extract_json
             data = _extract_json(res.text)

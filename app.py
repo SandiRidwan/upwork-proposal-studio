@@ -217,6 +217,12 @@ with tab_write:
                 file_name=f"proposal_{v['label']}.txt", key=f"dl_{v['label']}")
             st.divider()
 
+        needs = result["proposal"].get("needs") or []
+        if needs:
+            st.markdown("#### ❓ Need from you (fill these before sending)")
+            for n in needs:
+                st.markdown(f"- {n}")
+
         if result["proposal"]["screening_answers"]:
             st.markdown("#### 📝 Screening answers")
             for qa in result["proposal"]["screening_answers"]:

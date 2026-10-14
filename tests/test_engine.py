@@ -309,6 +309,49 @@ class TestProviders(unittest.TestCase):
             self.assertIn(k, st)
 
 
+class TestScreeningAndPlaceholders(unittest.TestCase):
+    def test_split_screening_pulls_pairs(self):
+        from engine.writer import _split_screening
+        text = ("Body line one.\n\nNEED FROM YOU:\n- rate?\n\n"
+                "SCREENING ANSWERS:\n"
+                "Q: Do you scrape?\nA: Yes, daily.\n"
+                "Q: AU real estate?\nA: Similar directories, yes.\n")
+        head, pairs = _split_screening(text)
+        self.assertNotIn("SCREENING ANSWERS", head)
+        self.assertEqual(len(pairs), 2)
+        self.assertEqual(pairs[0]["question"], "Do you scrape?")
+        self.assertEqual(pairs[1]["answer"], "Similar directories, yes.")
+
+    def test_strip_placeholders_removes_brackets(self):
+        from engine.writer import _strip_placeholders
+        messy = ("Real text here. [ADD: rate] More text.\n"
+                 "[need from you]\nClosing line?")
+        clean = _strip_placeholders(messy)
+        self.assertNotIn("[", clean)
+        self.assertNotIn("]", clean)
+        self.assertIn("Closing line?", clean)
+
+    def test_lint_flags_placeholder(self):
+        issues = lint("Good opener. [ADD: the rate] Send one URL.")
+        rules = {i["rule"] for i in issues}
+        self.assertIn("placeholder_left_in", rules)
+
+    def test_placeholders_make_score_drop(self):
+        from engine.score import score
+        val, issues = score("Nice hook. [ADD: price] What's the source?")
+        self.assertIn("placeholder_left_in", {i["rule"] for i in issues})
+        self.assertLess(val, 80)
+
+    def test_parse_questions(self):
+        from engine.pipeline import _parse_questions
+        qs = _parse_questions(
+            "1. Do you scrape?\n2) Have you done AU real estate?\n"
+            "- What is your rate?\n"
+            "This is not a question but is long enough to count")
+        self.assertEqual(len(qs), 4)
+        self.assertEqual(qs[0], "Do you scrape?")
+
+
 class TestPipeline(unittest.TestCase):
     def test_full_run(self):
         result = run(JOB_ANTIBOT, use_llm=False, review=True)
