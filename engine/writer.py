@@ -236,6 +236,8 @@ def build_prompt(analysis: JobAnalysis, job_post: str,
         f"CREDIBILITY FACT TO USE: {a.credibility_fact}\n"
         f"PORTFOLIO LINK (at most one): {a.portfolio_link}\n"
         f"ONE TRUE OBSERVATION: {a.one_true_observation}\n"
+        f"CLIENT STACK KEYWORDS (must appear in the first two lines): "
+        f"{', '.join(getattr(a, 'stack_keywords', []) or []) or '(none named)'}\n"
     )
 
     task = (
@@ -300,6 +302,8 @@ def write_one(analysis: JobAnalysis, job_post: str, *,
         body, needs = _split_needs(text)
         body = _strip_placeholders(body)
         body = _enforce_filter(body, getattr(analysis, "must_open_with", ""))
+        body = _enforce_stack_keyword(
+            body, getattr(analysis, "stack_keywords", []))
         v = _variant("proposal", body)
         v.lint = lint(v.body)
         bundle.variants = [v]
@@ -389,6 +393,52 @@ def _enforce_filter(body: str, word: str) -> str:
     return f"{word}. {stripped}"
 
 
+def _first_sentence(body: str) -> str:
+    """The first sentence of the body (up to the first . ! ?), trimmed."""
+    stripped = body.lstrip()
+    # find the first sentence terminator
+    for i, ch in enumerate(stripped):
+        if ch in ".!?":
+            return stripped[:i + 1]
+    return stripped
+
+
+def _stack_in_opening(body: str, keywords: list, chars: int = 200) -> bool:
+    """True if any client stack keyword appears in the opening window."""
+    if not keywords:
+        return True
+    head = body[:chars].lower()
+    return any(re.search(r"(?<![a-z0-9])" + re.escape(k.lower()) +
+                         r"(?![a-z0-9])", head) for k in keywords)
+
+
+def _stack_in_first_sentence(body: str, keywords: list) -> bool:
+    """True if any client stack keyword appears in the FIRST sentence."""
+    if not keywords:
+        return True
+    head = _first_sentence(body).lower()
+    return any(re.search(r"(?<![a-z0-9])" + re.escape(k.lower()) +
+                         r"(?![a-z0-9])", head) for k in keywords)
+
+
+def _enforce_stack_keyword(body: str, keywords: list) -> str:
+    """
+    Guarantee a client stack keyword appears in the FIRST sentence.
+
+    The Scroller judges line one, so a keyword buried in sentence two does not
+    count. If the opening is pure diagnosis with no tool named, lead with the two
+    most relevant keywords as a short match line. This is the last defence: the
+    prompt already asks for it, and this makes it certain.
+    """
+    if not keywords or _stack_in_first_sentence(body, keywords):
+        return body
+    picks = keywords[:2]
+    lead = " and ".join(picks) if len(picks) > 1 else picks[0]
+    stripped = body.lstrip()
+    return (f"{lead} is the day job here. I've run this shape of work, so "
+            f"{stripped[0].lower() + stripped[1:] if stripped else stripped}")
+
+
 def _strip_placeholders(text: str) -> str:
     """
     Remove any stray square-bracket placeholder or need-note that slipped into
@@ -457,6 +507,8 @@ def _one_prompt(analysis: JobAnalysis, job_post: str,
         f"CREDIBILITY FACT TO USE: {a.credibility_fact}\n"
         f"PORTFOLIO LINK (at most one): {a.portfolio_link}\n"
         f"ONE TRUE OBSERVATION: {a.one_true_observation}\n"
+        f"CLIENT STACK KEYWORDS (must appear in the first two lines): "
+        f"{', '.join(getattr(a, 'stack_keywords', []) or []) or '(none named)'}\n"
     )
     screening_block = ""
     if screening_questions:

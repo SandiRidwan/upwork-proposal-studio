@@ -430,6 +430,58 @@ class TestRateCard(unittest.TestCase):
         self.assertIn("Never", pos)
 
 
+class TestStackKeywordEnforcement(unittest.TestCase):
+    def test_detect_stack_keywords(self):
+        from engine.analyzer import _detect_stack_keywords
+        kws = _detect_stack_keywords(
+            "Advanced SQL and T-SQL on SQL Server, plus Python and Power BI.")
+        self.assertIn("T-SQL", kws)
+        self.assertIn("SQL Server", kws)
+        self.assertIn("Python", kws)
+        self.assertIn("Power BI", kws)
+        # the bare "SQL" must be dropped when a specific variant is present
+        self.assertNotIn("SQL", kws)
+
+    def test_detect_empty_when_no_stack(self):
+        from engine.analyzer import _detect_stack_keywords
+        self.assertEqual(_detect_stack_keywords("Just a friendly chat about ideas."), [])
+
+    def test_enforcement_prepends_when_missing(self):
+        from engine.writer import _enforce_stack_keyword, _stack_in_first_sentence
+        body = "Daily operations break in three places. Nobody owns the report."
+        kws = ["SQL Server", "T-SQL"]
+        self.assertFalse(_stack_in_first_sentence(body, kws))
+        fixed = _enforce_stack_keyword(body, kws)
+        self.assertTrue(_stack_in_first_sentence(fixed, kws))
+
+    def test_enforcement_splices_when_keyword_only_in_sentence_two(self):
+        from engine.writer import _enforce_stack_keyword, _stack_in_first_sentence
+        # keyword exists but NOT in the first sentence -> must still be spliced
+        body = "Data issues break in three places. Python and T-SQL are the day job."
+        kws = ["Python", "T-SQL"]
+        self.assertFalse(_stack_in_first_sentence(body, kws))
+        fixed = _enforce_stack_keyword(body, kws)
+        self.assertTrue(_stack_in_first_sentence(fixed, kws))
+
+    def test_enforcement_noop_when_present(self):
+        from engine.writer import _enforce_stack_keyword
+        body = "SQL Server and T-SQL are the day job. Here is the rest."
+        self.assertEqual(_enforce_stack_keyword(body, ["SQL Server", "T-SQL"]), body)
+
+    def test_enforcement_noop_without_keywords(self):
+        from engine.writer import _enforce_stack_keyword
+        body = "Some body with no tools named."
+        self.assertEqual(_enforce_stack_keyword(body, []), body)
+
+    def test_stack_keywords_flow_through_pipeline(self):
+        from engine.pipeline import run
+        # a SQL job must land niche G and expose its stack keywords
+        result = run("Advanced SQL and T-SQL required. SQL Server. Python.",
+                     use_llm=False, review=False)
+        self.assertEqual(result.analysis.niche, "G")
+        self.assertIn("T-SQL", result.analysis.stack_keywords)
+
+
 class TestPipeline(unittest.TestCase):
     def test_full_run(self):
         result = run(JOB_ANTIBOT, use_llm=False, review=True)

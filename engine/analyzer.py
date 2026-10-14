@@ -165,6 +165,7 @@ class JobAnalysis:
     variant: str = "short"
     niche_scores: dict = field(default_factory=dict)
     must_open_with: str = ""          # e.g. "Directory" (application filter)
+    stack_keywords: list = field(default_factory=list)  # named tools/stack
     used_llm: bool = False
 
     def to_dict(self) -> dict:
@@ -298,6 +299,7 @@ def analyze(job_post: str, *, use_llm: bool = True) -> JobAnalysis:
     a.failure_mode = _heuristic_failure_mode(text, niche)
     a.named_symptom = _heuristic_symptom(text)
     a.must_open_with = _detect_filter_word(text)
+    a.stack_keywords = _detect_stack_keywords(text)
 
     if use_llm and llm.is_live():
         refined = _refine_with_llm(a, text)
@@ -411,6 +413,42 @@ def _heuristic_failure_mode(text: str, niche: str) -> str:
     if niche == "B":
         return "Something that should run itself still needs a human."
     return "The current way of doing this is not working, and they want it fixed."
+
+
+def _detect_stack_keywords(text: str) -> list:
+    """
+    The tools and stack the CLIENT named in the post.
+
+    Upwork ranks a proposal partly by keyword match against the post, and a busy
+    client only reads the first two lines. So the writer must surface at least
+    one of these in the opening. Detected from the post, not guessed.
+    """
+    import re
+    catalog = [
+        "T-SQL", "TSQL", "SQL Server", "PostgreSQL", "Postgres", "MySQL", "SQLite",
+        "DuckDB", "BigQuery", "Snowflake", "Redshift", "Oracle", "MongoDB",
+        "SQL", "Python", "Pandas", "PySpark", "Spark", "dbt", "Airflow",
+        "Power BI", "Tableau", "Looker", "Streamlit", "Excel", "Google Sheets",
+        "Playwright", "Puppeteer", "Selenium", "Scrapy", "BeautifulSoup",
+        "curl_cffi", "Apify", "n8n", "Make.com", "Zapier",
+        "FastAPI", "Flask", "Docker", "AWS", "GCP", "Azure", "Railway",
+        "REST API", "ETL", "ELT",
+    ]
+    found = []
+    for kw in catalog:
+        if re.search(r"(?<![A-Za-z0-9])" + re.escape(kw) + r"(?![A-Za-z0-9])",
+                     text, re.I):
+            found.append(kw)
+    found.sort(key=len, reverse=True)
+    # drop the bare generic when a specific variant is present
+    if any(v in found for v in ("SQL Server", "T-SQL", "TSQL", "PostgreSQL",
+                                "Postgres", "MySQL", "SQLite", "DuckDB",
+                                "BigQuery", "Snowflake", "Redshift", "Oracle")):
+        if "SQL" in found:
+            found.remove("SQL")
+    if "REST API" in found and "API" in found:
+        found.remove("API")
+    return found
 
 
 def _heuristic_symptom(text: str) -> str:
