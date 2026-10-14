@@ -174,16 +174,16 @@ class TestSkillShape(unittest.TestCase):
     """The repo mirrors the two source skills' file layout and content."""
 
     def test_writer_skill_frontmatter(self):
+        # only the fields an agent host needs; no host-specific extras
         s = knowledge.writer_skill()
         self.assertTrue(s.startswith("---\nname: upwork-proposal\n"))
-        for key in ("description:", "mode: api-ui"):
-            self.assertIn(key, s)
+        self.assertIn("description:", s)
+        self.assertNotIn("mode: api-ui", s)
 
     def test_panel_skill_frontmatter(self):
         s = knowledge.panel_skill()
         self.assertTrue(s.startswith("---\nname: upwork-hiring-panel\n"))
-        for key in ("description:", "argument-hint:", "license: MIT",
-                    "mode: api-ui"):
+        for key in ("description:", "argument-hint:", "license: MIT"):
             self.assertIn(key, s)
 
     def test_writer_has_five_moves_and_voice(self):
@@ -242,6 +242,22 @@ class TestSkillShape(unittest.TestCase):
     def test_stays_on_upwork(self):
         self.assertIn("off Upwork", knowledge.panel_skill())
         self.assertIn("Stay on Upwork", knowledge.rubric())
+
+    def test_skills_are_host_neutral(self):
+        # both skills must be usable as agent-host skills (opencode / Claude):
+        # only name + description in frontmatter, and no Claude-only wording
+        import re
+        for getter in (knowledge.writer_skill, knowledge.panel_skill):
+            s = getter()
+            front = s.split("---")[1]
+            keys = re.findall(r"^([a-zA-Z_-]+):", front, re.M)
+            self.assertEqual(keys[0], "name")
+            self.assertIn("description", keys)
+            self.assertNotIn("api-ui", front)
+            self.assertNotIn("runs the skill through an API/UI", s)
+        # the "how it runs" note must be present in both
+        self.assertIn("How this skill runs", knowledge.writer_skill())
+        self.assertIn("How this skill runs", knowledge.panel_skill())
 
     def test_never_invents(self):
         self.assertIn("Never invent", knowledge.panel_skill())

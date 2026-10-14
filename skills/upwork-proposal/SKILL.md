@@ -1,14 +1,17 @@
 ---
 name: upwork-proposal
 description: Write Upwork proposals for Sandi (Data Automation Engineer, web-scraping specialist, anti-bot bypass, data pipelines and dashboards) in his proven voice, using his winning-proposal formula, his portfolio links, and his credibility anchors. Use this skill ANY time the user pastes an Upwork job description, a job post, a client brief, or an RFP, or says anything like "write a proposal", "apply to this", "cover letter for this job", "should I bid on this", "how do I pitch this client", or "rewrite this proposal". Trigger it even when the user just drops a job post with no instructions at all, since dropping a job post always means they want a proposal. Also use it to critique, tighten, or rewrite a draft proposal the user already wrote.
-mode: api-ui
 ---
 
 # Upwork Proposal Writer
 
 Write proposals that win by reducing the client's hiring risk, not by advertising Sandi. The client is scanning 40 proposals in 6 minutes. The job is to be the one that sounds like it was written by someone who already understands their problem.
 
-> **This repo runs the skill through an API/UI, not the Claude CLI.** There is no `/upwork-proposal` slash command here. The same instructions are executed by `engine/` and driven from `app.py`. Everything below the frontmatter is the skill itself, kept as close to the original as possible so the behaviour is the same. The only structural difference is *how it is invoked*: the reference skill is a Claude Skill, this one is an API + Streamlit UI.
+> **How this skill runs.** The same SKILL.md works in two places.
+> 1. **As a skill in an agent host** (opencode, Claude Code, or any host that reads a `skills/<name>/SKILL.md` folder): the agent reads this file and its `references/` and follows the workflow directly.
+> 2. **Through this repo's engine** (`engine/`, driven by `app.py`): the engine prints this file into the prompt and calls the configured LLM.
+>
+> The only host-specific note is about the seven-agent panel, in the companion skill `upwork-hiring-panel`. Nothing in this file is Claude-only.
 
 ## Identity
 

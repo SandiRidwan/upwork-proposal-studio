@@ -100,33 +100,81 @@ Then paste a job post, click **Analyze & write**.
 ### Optional: live LLM prose
 
 Without a key, the studio still works — it produces a ready-to-paste prompt you can
-run in opencode or any chat, plus editable scaffolds. For full prose, set one key:
+run in opencode or any chat, plus editable scaffolds. For full prose, put a key in
+`.env` (copy `.env.example`):
 
 ```bash
-# any one of these
-set OPENAI_API_KEY=sk-...
-set GROQ_API_KEY=gsk_...
-set OPENROUTER_API_KEY=sk-or-...
+GEMINI_API_KEY=...        # Google, free tier available
+# or any one of:
+OPENAI_API_KEY=sk-...
+GROQ_API_KEY=gsk_...
+OPENROUTER_API_KEY=sk-or-...
 # or a local model
-set UPS_PROVIDER=ollama
-set UPS_MODEL=llama3.1
+UPS_PROVIDER=ollama
+UPS_MODEL=llama3.1
 ```
+
+Keys are read automatically from `./.env`, then `../clipper-tools/.env`. A real
+shell variable always wins over the file. If several keys are listed under
+`GEMINI_API_KEYS` (comma/space separated), the studio rotates them on a rate limit.
 
 Extra controls:
 
 ```bash
-set UPS_LLM_MODE=prompt     # never call an API, always return the prompt
-set UPS_LLM_MODE=provider   # require a provider
-set UPS_BASE_URL=...        # custom OpenAI-compatible endpoint
+UPS_LLM_MODE=prompt     # never call an API, always return the prompt
+UPS_LLM_MODE=provider   # require a provider
+UPS_BASE_URL=...        # custom OpenAI-compatible endpoint
+UPS_ENV_FILE=...        # point at a different .env path
 ```
 
-### CLI (works inside opencode)
+### CLI
 
 ```bash
 python -m engine.cli --job-file job.txt --out result.json
 python -m engine.cli --job-file job.txt --rewrite --json
+python -m engine.cli --save-win winning-proposal.txt   # add a hired win
 type job.txt | python -m engine.cli
 ```
+
+---
+
+## Use in opencode (or Claude Code)
+
+The two skills are **not** only for the UI. They use the standard
+`skills/<name>/SKILL.md` layout, which **opencode reads natively** (same as Claude
+Code). The repo ships an installer:
+
+```bash
+python -m engine.install --list              # show target folders
+python -m engine.install                     # auto-detect opencode / claude
+python -m engine.install --host opencode
+python -m engine.install --target <dir>
+```
+
+It copies `skills/upwork-proposal` and `skills/upwork-hiring-panel` into the host's
+skills folder (`~/.config/opencode/skills`, or `~/.claude/skills`). Start a new
+session afterwards, and the host lists them:
+
+```bash
+opencode debug skill        # shows upwork-proposal and upwork-hiring-panel
+```
+
+Then inside opencode you can paste a job post and say **"write a proposal"** — the
+agent reads `SKILL.md` and its `references/` and follows the five moves itself. Ask
+it to **"run the hiring panel on this proposal, here's the job post"** and it plays
+the seven reviewers from `personas.md` one at a time.
+
+**Same skill, three ways to run it:**
+
+| Where | How it runs |
+|---|---|
+| opencode / Claude Code | The agent host reads `SKILL.md` + `references/` directly |
+| This repo's UI | `streamlit run app.py` → `engine/` prints the SKILL.md into the prompt |
+| This repo's CLI | `python -m engine.cli --job-file job.txt` |
+
+No conversion is needed. The only host-specific difference is the agent *sub-agent
+mechanism* (opencode plays the seven reviewers itself; the engine sends one LLM
+call), noted in `skills/upwork-hiring-panel/SKILL.md`.
 
 ---
 
@@ -150,10 +198,11 @@ files are edited in place exactly as a Claude Skill would be:
 | `skills/upwork-hiring-panel/references/winning-patterns.md` | Grounding in what clients actually see; overrides taste |
 | `skills/upwork-hiring-panel/references/hook-lab.md` | The hook loop and the blind lineup |
 
-The only two structural differences from the source skills: they are invoked by a
-Claude `/command`, this one is invoked by an **API + Streamlit UI**; and the seven
-"sub-agents" are played either by one LLM call (when a key is set) or by the
-deterministic panel in `engine/panel.py` (when not).
+There is **no structural difference** from the source skills: the same `SKILL.md`
+plus `references/` layout, which opencode and Claude Code both read. The only
+difference is *how they are invoked* — as a skill by an agent host, or through this
+repo's engine (UI / CLI, with the seven reviewers played by one LLM call or by the
+deterministic panel in `engine/panel.py` when no key is set).
 
 **Hard rule the engine enforces:** it never invents a client, a result, or a metric.
 If a required fact is missing, it writes `[ADD: ...]` and asks.

@@ -4,7 +4,6 @@ description: >-
   Run an Upwork proposal past a hiring panel of seven agents that each judge it alone as a different reader (a busy client who only sees the profile card and preview, the hiring client, a budget-conscious client, a competing freelancer, a burned-before skeptic, a technical lead and an Upwork veteran), grounded in what Upwork shows clients, market data and the freelancer's own hired proposals. Scores hook, clarity, relevance, credibility, value proposition and interview potential, explains why it gets skipped or rejected, then rewrites it in the proof-first shape, tests the hook against a blind lineup of competitor previews until clients would open it first, with a fixed answer for every screening question and a visibility checklist. Has a fast mode for freshly posted jobs. Use when the user gives a proposal (file path or pasted text) and the job post, or asks to review, score, critique or rewrite an Upwork proposal or cover letter.
 argument-hint: "[fast] <proposal file or pasted text> [job post] [bid/rate] [screening questions] [profile]"
 license: MIT
-mode: api-ui
 metadata:
   version: "1.0.0"
 ---
@@ -13,7 +12,11 @@ metadata:
 
 The user gives you an Upwork proposal (with the job post). Seven reviewers judge it alone, you merge what they found, explain why it gets skipped or rejected, and rewrite it so a client opens it and wants to interview the freelancer. Never flatter the proposal.
 
-> **This repo runs the skill through an API/UI, not the Claude CLI.** There is no `/upwork-hiring-panel` slash command here, and no `~/.claude/` folder. The same instructions are executed by `engine/panel.py` and driven from `app.py`. Everything below the frontmatter is the skill itself, kept as close to the original as possible so the behaviour is the same. The only structural differences are *how it is invoked* (API + Streamlit UI) and *how sub-agents are played* (the engine either calls an LLM once with all seven briefs, or runs a deterministic heuristic panel when no key is set; see `engine/panel.py`).
+> **How this skill runs.** The same SKILL.md works in two places.
+> 1. **As a skill in an agent host** (opencode, Claude Code, or any host that reads a `skills/<name>/SKILL.md` folder): the agent reads this file and its `references/` and plays the seven reviewers itself, one at a time, writing each verdict down before reading the next brief.
+> 2. **Through this repo's engine** (`engine/panel.py`, driven by `app.py`): the engine sends all seven briefs in one LLM call and parses the verdicts, or runs a deterministic heuristic panel when no key is set.
+>
+> Where the original references `~/.claude/upwork-hiring-panel/wins.md`, this repo stores the same file at `knowledge/wins.md`. Nothing else is host-specific.
 
 Before starting, read these files in this skill folder:
 - `references/winning-patterns.md`: what clients see before opening, what the data says, and the proof-first shape of hired proposals. **This overrides any reviewer's taste.**
