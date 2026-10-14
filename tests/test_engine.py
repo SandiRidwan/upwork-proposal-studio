@@ -336,6 +336,18 @@ class TestScreeningAndPlaceholders(unittest.TestCase):
         rules = {i["rule"] for i in issues}
         self.assertIn("placeholder_left_in", rules)
 
+    def test_lint_flags_post_criticism(self):
+        bad = ("Your post names Python but no process, no data source, no "
+               "acceptance criteria.")
+        rules = {i["rule"] for i in lint(bad)}
+        self.assertIn("criticises_post", rules)
+
+    def test_lint_passes_clean_without_critique(self):
+        good = ("Agent orchestration and tool calling decide whether a workflow "
+                "survives month three. Send one workflow and I'll map it, free.")
+        rules = {i["rule"] for i in lint(good)}
+        self.assertNotIn("criticises_post", rules)
+
     def test_placeholders_make_score_drop(self):
         from engine.score import score
         val, issues = score("Nice hook. [ADD: price] What's the source?")
@@ -454,10 +466,14 @@ class TestStackKeywordEnforcement(unittest.TestCase):
         fixed = _enforce_stack_keyword(body, kws)
         self.assertTrue(_stack_in_first_sentence(fixed, kws))
 
-    def test_enforcement_splices_when_keyword_only_in_sentence_two(self):
+    def test_enforcement_splices_only_when_no_keyword_in_opening(self):
         from engine.writer import _enforce_stack_keyword, _stack_in_first_sentence
-        # keyword exists but NOT in the first sentence -> must still be spliced
-        body = "Data issues break in three places. Python and T-SQL are the day job."
+        # keyword only in sentence two AND outside the 200-char window -> splice
+        body = ("Data issues break in three places and nobody owns them, which "
+                "is the real cost. This paragraph is deliberately long so the "
+                "keyword falls past the two-hundred character opening window "
+                "the enforcement uses. Filler sentence to push it out further. "
+                "Python and T-SQL are the day job.")
         kws = ["Python", "T-SQL"]
         self.assertFalse(_stack_in_first_sentence(body, kws))
         fixed = _enforce_stack_keyword(body, kws)
@@ -480,6 +496,41 @@ class TestStackKeywordEnforcement(unittest.TestCase):
                      use_llm=False, review=False)
         self.assertEqual(result.analysis.niche, "G")
         self.assertIn("T-SQL", result.analysis.stack_keywords)
+
+
+    def test_enforcement_grammar_singular_plural(self):
+        from engine.writer import _enforce_stack_keyword
+        # two keywords -> "are", one -> "is"
+        one = _enforce_stack_keyword("Data breaks in three places.", ["Python"])
+        self.assertIn("Python is the day job", one)
+        two = _enforce_stack_keyword("Data breaks in three places.",
+                                     ["Python", "SQL"])
+        self.assertIn("Python and SQL are the day job", two)
+
+    def test_enforcement_noop_when_keyword_in_opening_window(self):
+        # if the stack is already in the first 200 chars (even sentence two),
+        # leave the model's opener alone rather than splicing awkwardly
+        from engine.writer import _enforce_stack_keyword
+        body = ("Data issues that keep coming back usually mean the root cause "
+                "was never found. Python and T-SQL is how I close them.")
+        self.assertEqual(_enforce_stack_keyword(body, ["Python", "T-SQL"]), body)
+
+
+class TestAiAutomationNiche(unittest.TestCase):
+    def test_ai_agent_job_detected_as_automation(self):
+        a = analyze(
+            "AI Automation Developer. AI Agent Development workflows, LLM-powered "
+            "applications, structured tool calling and agent orchestration. n8n, "
+            "RAG, OpenAI, Claude, Gemini, LangGraph, MCP. Human-in-the-loop. "
+            "Python, FastAPI, PostgreSQL.")
+        self.assertEqual(a.niche, "B")
+        for kw in ("RAG", "LangGraph", "OpenAI", "Claude", "Gemini", "MCP"):
+            self.assertIn(kw, a.stack_keywords)
+
+    def test_prototype_failure_mode(self):
+        a = analyze("We tried an AI agent but it is still a chatbot prototype "
+                    "that never made it past demo.")
+        self.assertIn("prototype", a.failure_mode.lower())
 
 
 class TestPipeline(unittest.TestCase):

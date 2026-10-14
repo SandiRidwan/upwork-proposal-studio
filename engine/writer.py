@@ -148,6 +148,12 @@ TOOL NAMES: use the correct term for the stack. On PostgreSQL it is EXPLAIN
 (ANALYZE); on SQL Server / T-SQL it is the execution plan (SHOWPLAN / Actual
 Execution Plan), not EXPLAIN. Naming the wrong tool reads as inexperience.
 
+NEVER CRITICISE THE POST. Do not write "no process, no data source, no
+acceptance criteria", "the post is vague", or anything that tells the client
+their own brief is weak. It reads as a lecture and loses the job. If the brief is
+vague, ask a sharp question instead - a question proves judgment, a critique
+insults.
+
 CRITICAL - placeholders never go in the proposal body:
 - The proposal body must be READY TO SEND. It must contain no square-bracket text,
   no [ADD], no to-do notes, no commentary.
@@ -432,10 +438,19 @@ def _enforce_stack_keyword(body: str, keywords: list) -> str:
     """
     if not keywords or _stack_in_first_sentence(body, keywords):
         return body
+    # do NOT splice a keyword line when the model already opened with the
+    # client's problem but named the stack in the second sentence - a wrong
+    # splice reads worse than the keyword being one sentence late. Only splice
+    # when the opening has NO stack keyword at all in the first 200 chars.
+    if _stack_in_opening(body, keywords):
+        return body
     picks = keywords[:2]
-    lead = " and ".join(picks) if len(picks) > 1 else picks[0]
+    if len(picks) > 1:
+        lead = f"{picks[0]} and {picks[1]} are the day job here."
+    else:
+        lead = f"{picks[0]} is the day job here."
     stripped = body.lstrip()
-    return (f"{lead} is the day job here. I've run this shape of work, so "
+    return (f"{lead} I've run this shape of work, so "
             f"{stripped[0].lower() + stripped[1:] if stripped else stripped}")
 
 
@@ -713,6 +728,16 @@ def lint(body: str) -> list:
     if re.search(r"\[[^\]]*\]", body):
         issues.append({"rule": "placeholder_left_in",
                        "detail": "square-bracket note in the body"})
+
+    # never criticise the client's own post
+    for pat in (r"\bno business process\b", r"\bno data source\b",
+                r"\bno acceptance criteria\b", r"\bthe post is vague\b",
+                r"\byour post (is|does not|doesn't)\b",
+                r"\bpost names .{0,40}but no\b"):
+        if re.search(pat, low):
+            issues.append({"rule": "criticises_post",
+                           "detail": "critiques the client's brief"})
+            break
 
     for phrase in BANNED_PHRASES:
         if phrase in low:

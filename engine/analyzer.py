@@ -54,6 +54,14 @@ NICHE_SIGNALS = {
             "crm", "hubspot", "salesforce", "sheets", "google sheets",
             "recurring", "scheduled", "run daily", "ongoing", "etl",
             "etl processes", "scheduled job", "runs itself", "babysit",
+            # AI automation / agent signals
+            "ai agent", "agent development", "agent orchestration", "llm",
+            "llm-powered", "llm apis", "prompt engineering", "tool calling",
+            "structured tool calling", "human-in-the-loop", "human in the loop",
+            "rag", "retrieval augmented", "vector database", "vector store",
+            "langchain", "langgraph", "mcp", "openai", "anthropic", "claude",
+            "gemini", "ai integration", "ai workflow", "intelligent automation",
+            "multi-step ai", "grounding",
         ],
         "weight": 1.0,
     },
@@ -400,6 +408,10 @@ def _heuristic_failure_mode(text: str, niche: str) -> str:
     if any(k in low for k in ["don't trust", "can't trust", "wrong numbers",
                               "inaccurate", "not sure if"]):
         return "They cannot trust the numbers they already have."
+    if any(k in low for k in ["chatbot", "prototype", "demo", "proof of concept",
+                              "poc "]):
+        return ("Their last AI attempt stopped at a prototype and never survived "
+                "contact with real traffic.")
     if any(k in low for k in ["etl", "pipeline", "scheduled", "keep running",
                               "recurring", "without us"]):
         return "Something that should run itself still needs a human."
@@ -433,6 +445,10 @@ def _detect_stack_keywords(text: str) -> list:
         "curl_cffi", "Apify", "n8n", "Make.com", "Zapier",
         "FastAPI", "Flask", "Docker", "AWS", "GCP", "Azure", "Railway",
         "REST API", "ETL", "ELT",
+        # AI / agents
+        "LangChain", "LangGraph", "MCP", "OpenAI", "Anthropic", "Claude",
+        "Gemini", "RAG", "vector database", "pgvector", "Pinecone", "Chroma",
+        "human-in-the-loop", "tool calling", "agent orchestration",
     ]
     found = []
     for kw in catalog:
