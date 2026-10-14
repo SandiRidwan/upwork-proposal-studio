@@ -148,27 +148,43 @@ Code). The repo ships an installer:
 python -m engine.install --list              # show target folders
 python -m engine.install                     # auto-detect opencode / claude
 python -m engine.install --host opencode
+python -m engine.install --project .         # into ./.opencode/skills (this repo only)
 python -m engine.install --target <dir>
 ```
 
 It copies `skills/upwork-proposal` and `skills/upwork-hiring-panel` into the host's
-skills folder (`~/.config/opencode/skills`, or `~/.claude/skills`). Start a new
-session afterwards, and the host lists them:
+skills folder — `~/.config/opencode/skills` for opencode, `~/.claude/skills` for
+Claude. Opencode finds skills in all of these places (documented):
+
+- `.opencode/skills/<name>/SKILL.md` (project-local)
+- `~/.config/opencode/skills/<name>/SKILL.md` (global)
+- `.claude/skills/...` and `~/.claude/skills/...` (Claude-compatible)
+- `.agents/skills/...` and `~/.agents/skills/...` (agent-compatible)
+
+Start a new session afterwards. Confirm the host sees them:
 
 ```bash
-opencode debug skill        # shows upwork-proposal and upwork-hiring-panel
+opencode debug skill        # lists upwork-proposal and upwork-hiring-panel
 ```
 
-Then inside opencode you can paste a job post and say **"write a proposal"** — the
-agent reads `SKILL.md` and its `references/` and follows the five moves itself. Ask
-it to **"run the hiring panel on this proposal, here's the job post"** and it plays
-the seven reviewers from `personas.md` one at a time.
+**In opencode, both skills expose a slash command** (via
+`metadata["opencode/slash"] = "true"`), so you can just type them:
+
+```
+/upwork-proposal        ← then paste the job post
+/upwork-hiring-panel    ← paste your proposal + the job post
+```
+
+They also auto-invoke: paste a job post with no command and saying "write a
+proposal" is enough, because the skill's `description` tells the agent when to load
+it. Either way the agent reads `SKILL.md` + `references/` and follows the workflow
+itself.
 
 **Same skill, three ways to run it:**
 
 | Where | How it runs |
 |---|---|
-| opencode / Claude Code | The agent host reads `SKILL.md` + `references/` directly |
+| opencode / Claude Code | The agent host reads `SKILL.md` + `references/` (slash command or auto-invoke) |
 | This repo's UI | `streamlit run app.py` → `engine/` prints the SKILL.md into the prompt |
 | This repo's CLI | `python -m engine.cli --job-file job.txt` |
 

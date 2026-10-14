@@ -245,19 +245,28 @@ class TestSkillShape(unittest.TestCase):
 
     def test_skills_are_host_neutral(self):
         # both skills must be usable as agent-host skills (opencode / Claude):
-        # only name + description in frontmatter, and no Claude-only wording
+        # frontmatter carries only standard Agent Skills fields, no host-specific
+        # top-level keys. opencode reads name/description/license/metadata.
         import re
+        allowed = {"name", "description", "license", "compatibility", "metadata"}
         for getter in (knowledge.writer_skill, knowledge.panel_skill):
             s = getter()
             front = s.split("---")[1]
-            keys = re.findall(r"^([a-zA-Z_-]+):", front, re.M)
-            self.assertEqual(keys[0], "name")
+            keys = set(re.findall(r"^([a-zA-Z_-]+):", front, re.M))
+            self.assertIn("name", keys)
             self.assertIn("description", keys)
+            self.assertTrue(keys <= allowed, f"unexpected frontmatter keys: "
+                            f"{keys - allowed}")
             self.assertNotIn("api-ui", front)
             self.assertNotIn("runs the skill through an API/UI", s)
         # the "how it runs" note must be present in both
         self.assertIn("How this skill runs", knowledge.writer_skill())
         self.assertIn("How this skill runs", knowledge.panel_skill())
+
+    def test_skills_expose_opencode_slash(self):
+        # opencode turns metadata["opencode/slash"]="true" into a /command
+        for getter in (knowledge.writer_skill, knowledge.panel_skill):
+            self.assertIn('opencode/slash: "true"', getter())
 
     def test_never_invents(self):
         self.assertIn("Never invent", knowledge.panel_skill())

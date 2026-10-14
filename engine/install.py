@@ -37,7 +37,8 @@ def _home() -> Path:
 def host_dirs(host: str) -> list[Path]:
     h = _home()
     if host == "opencode":
-        return [h / ".config" / "opencode" / "skills", h / ".agents" / "skills"]
+        # the documented opencode location
+        return [h / ".config" / "opencode" / "skills"]
     if host == "claude":
         return [h / ".claude" / "skills"]
     if host == "both":
@@ -79,12 +80,42 @@ def install(target: Path | None = None, host: str = "opencode",
     return done
 
 
+def install_project_local(project: Path) -> list[str]:
+    """
+    Copy the skills into <project>/.opencode/skills so opencode picks them up
+    only while working inside this repo (no global install needed).
+    """
+    base = Path(project) / ".opencode" / "skills"
+    done = []
+    for name in _SKILLS:
+        src = _SRC / name
+        if not src.is_dir():
+            continue
+        dst = base / name
+        base.mkdir(parents=True, exist_ok=True)
+        if dst.exists():
+            shutil.rmtree(dst)
+        shutil.copytree(src, dst)
+        done.append(str(dst))
+    return done
+
+
 def main(argv=None) -> int:
     ap = argparse.ArgumentParser(prog="python -m engine.install")
     ap.add_argument("--host", default="", help="opencode | claude | both")
     ap.add_argument("--target", default="", help="explicit skills directory")
+    ap.add_argument("--project", default="", help="install into "
+                    "<project>/.opencode/skills (project-local)")
     ap.add_argument("--list", action="store_true", help="show targets, do nothing")
     args = ap.parse_args(argv)
+
+    if args.project:
+        done = install_project_local(Path(args.project))
+        print(f"Installed into {args.project}\\.opencode\\skills")
+        for d in done:
+            print(f"  {d}")
+        print("\nStart opencode inside that project; the skills load automatically.")
+        return 0
 
     host = args.host or detect_host()
     target = Path(args.target) if args.target else None

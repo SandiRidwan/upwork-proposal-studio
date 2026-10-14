@@ -2,10 +2,11 @@
 name: upwork-hiring-panel
 description: >-
   Run an Upwork proposal past a hiring panel of seven agents that each judge it alone as a different reader (a busy client who only sees the profile card and preview, the hiring client, a budget-conscious client, a competing freelancer, a burned-before skeptic, a technical lead and an Upwork veteran), grounded in what Upwork shows clients, market data and the freelancer's own hired proposals. Scores hook, clarity, relevance, credibility, value proposition and interview potential, explains why it gets skipped or rejected, then rewrites it in the proof-first shape, tests the hook against a blind lineup of competitor previews until clients would open it first, with a fixed answer for every screening question and a visibility checklist. Has a fast mode for freshly posted jobs. Use when the user gives a proposal (file path or pasted text) and the job post, or asks to review, score, critique or rewrite an Upwork proposal or cover letter.
-argument-hint: "[fast] <proposal file or pasted text> [job post] [bid/rate] [screening questions] [profile]"
 license: MIT
 metadata:
   version: "1.0.0"
+  opencode/slash: "true"
+  argument-hint: "[fast] <proposal file or pasted text> [job post] [bid/rate] [screening questions] [profile]"
 ---
 
 # /upwork-hiring-panel

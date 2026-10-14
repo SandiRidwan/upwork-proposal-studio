@@ -1,6 +1,10 @@
 ---
 name: upwork-proposal
 description: Write Upwork proposals for Sandi (Data Automation Engineer, web-scraping specialist, anti-bot bypass, data pipelines and dashboards) in his proven voice, using his winning-proposal formula, his portfolio links, and his credibility anchors. Use this skill ANY time the user pastes an Upwork job description, a job post, a client brief, or an RFP, or says anything like "write a proposal", "apply to this", "cover letter for this job", "should I bid on this", "how do I pitch this client", or "rewrite this proposal". Trigger it even when the user just drops a job post with no instructions at all, since dropping a job post always means they want a proposal. Also use it to critique, tighten, or rewrite a draft proposal the user already wrote.
+license: MIT
+metadata:
+  version: "1.0.0"
+  opencode/slash: "true"
 ---
 
 # Upwork Proposal Writer
