@@ -98,6 +98,7 @@ class PanelReport:
     rewrite: str = ""
     before_after: dict = field(default_factory=dict)
     used_llm: bool = False
+    llm_error: str = ""   # why the LLM panel did not run (never swallow it)
 
     def to_dict(self) -> dict:
         return {
@@ -109,6 +110,7 @@ class PanelReport:
             "rewrite": self.rewrite,
             "before_after": self.before_after,
             "used_llm": self.used_llm,
+            "llm_error": self.llm_error,
         }
 
 
@@ -390,10 +392,13 @@ def _llm_enrich(report: PanelReport, proposal: str, job_post: str,
     )
     res = llm.ask(_PANEL_SYSTEM, user, temperature=0.4, max_tokens=3000)
     if not res.ok:
+        report.llm_error = res.error or "LLM call failed"
         return
     from .analyzer import _extract_json
     data = _extract_json(res.text)
     if not isinstance(data, dict):
+        report.llm_error = ("LLM returned non-JSON: "
+                            + (res.text or "")[:160].replace("\n", " "))
         return
     report.used_llm = True
 

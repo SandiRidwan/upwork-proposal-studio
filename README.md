@@ -104,8 +104,10 @@ run in opencode or any chat, plus editable scaffolds. For full prose, put a key 
 `.env` (copy `.env.example`):
 
 ```bash
+# The engine reuses opencode's own provider by default (reads
+# ~/.local/share/opencode/auth.json), so it runs the SAME model as opencode.
+# Override with any of these in .env:
 GEMINI_API_KEY=...        # Google, free tier available
-# or any one of:
 OPENAI_API_KEY=sk-...
 GROQ_API_KEY=gsk_...
 OPENROUTER_API_KEY=sk-or-...
@@ -113,6 +115,10 @@ OPENROUTER_API_KEY=sk-or-...
 UPS_PROVIDER=ollama
 UPS_MODEL=llama3.1
 ```
+
+Provider order is `opencode` (auth.json) → `gemini` → `openai` → `groq` →
+`openrouter` → `ollama`. The first one with a usable key wins. Set
+`UPS_PROVIDER` to force one.
 
 Keys are read automatically from `./.env`, then `../clipper-tools/.env`. A real
 shell variable always wins over the file. If several keys are listed under
@@ -263,14 +269,33 @@ upwork-proposal-studio/
 └── README.md
 ```
 
+## Score any proposal
+
+Compare what opencode (or a model) produced against the same deterministic rules the
+engine uses, with a number instead of a vibe:
+
+```bash
+python -m engine.score proposal.txt
+type proposal.txt | python -m engine.score
+```
+
+Prints a 0–100 score and the concrete rule violations (banned phrases, exclamation
+points, emoji, em dashes, pronoun ratio, AI tells, length).
+
+## Test in opencode
+
+`examples/TEST-IN-OPENCODE.md` is a step-by-step script for testing the skills inside
+opencode with opencode's own model (no Gemini). `examples/epa-wastewater-job.md` is a
+real public-sector brief to test on, with notes on what a good result looks like.
+
 ## Run the tests
 
 ```bash
 python -m unittest discover -s tests
 ```
 
-No API key, no network. Tests cover the analyzer, linter, panel verdicts, and a
-full pipeline run.
+No API key, no network. Tests cover the analyzer, linter, panel verdicts, the
+deterministic scorer, provider wiring, and a full pipeline run.
 
 ## Notes
 

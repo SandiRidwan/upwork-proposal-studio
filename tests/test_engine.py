@@ -273,6 +273,42 @@ class TestSkillShape(unittest.TestCase):
         self.assertIn("[ADD: ...]", knowledge.panel_skill())
 
 
+class TestScoring(unittest.TestCase):
+    def test_clean_scores_high(self):
+        from engine.score import score
+        good = ("Blocked usually means the wrong path. Two sites everyone calls "
+                "impossible, Akamai and DataDome, neither needed a browser. "
+                "Send one URL and you'll know tonight, free. What's the site?")
+        val, issues = score(good)
+        self.assertGreaterEqual(val, 85)
+        hard = [i for i in issues if i["rule"] in ("banned_phrase", "emoji",
+                                                   "exclamation", "ai_tell")]
+        self.assertEqual(hard, [])
+
+    def test_bad_scores_low(self):
+        from engine.score import score
+        bad = ("I am a professional expert with many years of experience! I hope "
+               "this finds you well. Looking forward to hearing from you!")
+        val, issues = score(bad)
+        self.assertLess(val, 60)
+        self.assertTrue(any(i["rule"] == "banned_phrase" for i in issues))
+
+
+class TestProviders(unittest.TestCase):
+    def test_opencode_provider_is_first_and_named(self):
+        from engine.llm import PROVIDERS
+        first = next(iter(PROVIDERS))
+        self.assertEqual(first, "opencode")
+        self.assertIn("base_url", PROVIDERS["opencode"])
+        self.assertTrue(PROVIDERS["opencode"]["key_env"])
+
+    def test_llm_status_shape(self):
+        from engine import llm
+        st = llm.status()
+        for k in ("mode", "provider", "model", "live", "keys"):
+            self.assertIn(k, st)
+
+
 class TestPipeline(unittest.TestCase):
     def test_full_run(self):
         result = run(JOB_ANTIBOT, use_llm=False, review=True)

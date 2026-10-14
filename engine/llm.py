@@ -40,6 +40,15 @@ _env.load_env()
 # ---------------------------------------------------------------- providers
 
 PROVIDERS = {
+    "opencode": {
+        # Reuses the provider opencode already runs (from its auth.json), so the
+        # engine and the opencode agent use the SAME model. Tokenharbor is first
+        # in the author's setup; UPS_OPENCODE_BASE_URL / UPS_MODEL override.
+        "base_url": "https://tokenharbor.ai/v1",
+        "key_env": "OPENCODE_API_KEY",
+        "default_model": "deepseek-v4.1-flash:free",
+        "base_url_env": "OPENCODE_BASE_URL",
+    },
     "gemini": {
         # Google's OpenAI-compatible endpoint.
         # gemini-flash-lite-latest works across both older and newer Cloud
@@ -186,7 +195,11 @@ def ask(
         )
 
     cfg = PROVIDERS[prov]
-    base_url = os.environ.get("UPS_BASE_URL") or cfg["base_url"]
+    base_url = (
+        os.environ.get("UPS_BASE_URL")
+        or (os.environ.get(cfg["base_url_env"]) if cfg.get("base_url_env") else "")
+        or cfg["base_url"]
+    )
     model = os.environ.get("UPS_MODEL") or cfg["default_model"]
     keys = _keys_for(prov, cfg)
 

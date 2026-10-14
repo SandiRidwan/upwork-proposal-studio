@@ -252,6 +252,9 @@ with tab_review:
             f"**Interview chance:** :{color}[{chance}]  ·  "
             f"{'LLM panel' if panel['used_llm'] else 'heuristic panel'}  ·  "
             f"{result['meta'].get('panel_reviewers', 7)} reviewers")
+        if not panel["used_llm"] and panel.get("llm_error"):
+            st.warning("The LLM panel did not run, so this is the deterministic "
+                       f"panel. Reason: {panel['llm_error']}")
 
         sc = panel["scores"]
         cols = st.columns(len(SCORE_DIMENSIONS))
